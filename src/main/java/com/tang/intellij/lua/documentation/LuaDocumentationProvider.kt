@@ -19,12 +19,16 @@ package com.tang.intellij.lua.documentation
 import com.intellij.codeInsight.documentation.DocumentationManagerUtil
 import com.intellij.lang.documentation.AbstractDocumentationProvider
 import com.intellij.lang.documentation.DocumentationProvider
+import com.intellij.psi.PsiComment
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.refactoring.suggested.startOffset
 import com.tang.intellij.lua.comment.psi.LuaDocTagAlias
 import com.tang.intellij.lua.comment.psi.LuaDocTagClass
 import com.tang.intellij.lua.comment.psi.LuaDocTagField
+import com.tang.intellij.lua.comment.psi.api.LuaComment
 import com.tang.intellij.lua.editor.completion.LuaDocumentationLookupElement
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.search.PsiSearchContext
@@ -38,9 +42,16 @@ import com.tang.intellij.lua.ty.*
  */
 class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationProvider {
 
-    private val renderer = object: TyRenderer() {
+    private val renderer = object : TyRenderer() {
         override fun renderTypeName(t: String): String {
-            return if (t.isNotEmpty()) buildString { DocumentationManagerUtil.createHyperlink(this, t, t, true) } else t
+            return if (t.isNotEmpty()) buildString {
+                // 避免字符包含"/"显示提示异常
+                var refText = t
+                if (t.contains("/")) {
+                    refText = ""
+                }
+                DocumentationManagerUtil.createHyperlink(this, refText, t, true)
+            } else t
         }
 
         override fun renderGenericParams(params: Collection<String>?): String {
@@ -54,7 +65,9 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
             val ty = element.guessType(context)
             if (ty != null) {
                 return buildString {
+                    renderer.showStructComment = true
                     renderTy(this, ty, renderer)
+                    renderer.showStructComment = false
                 }
             }
         }
@@ -87,17 +100,19 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                     val ty = element.guessType(context) ?: Primitives.UNKNOWN
 
                     sb.append("local <b>${element.name}</b>: ")
-
+                    renderer.showStructComment = true
                     if (renderer.isMemberPunctuationRequired(ty)) {
                         "(${renderTy(sb, ty, tyRenderer)})"
                     } else {
                         renderTy(sb, ty, tyRenderer)
                     }
+                    renderer.showStructComment = false
                 }
 
                 val owner = PsiTreeUtil.getParentOfType(element, LuaCommentOwner::class.java)
                 owner?.let { renderComment(sb, owner.comment, tyRenderer) }
             }
+
             is LuaLocalFuncDefStat -> {
                 sb.wrapTag("pre") {
                     sb.append("local function <b>${element.name}</b>")
@@ -202,7 +217,28 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
         val commentOwner = classMember as? LuaCommentOwner ?: effectiveMember as? LuaCommentOwner
 
         if (commentOwner != null) {
-            renderComment(sb, commentOwner.comment, tyRenderer)
+            if (commentOwner.comment != null) {
+                renderComment(sb, commentOwner.comment, tyRenderer)
+            }
+            else
+            {
+                val doc = PsiDocumentManager.getInstance(context.project).getDocument(commentOwner.containingFile)
+                if (doc != null) {
+                    val lineNumber = doc.getLineNumber(commentOwner.startOffset)
+                    var current: PsiElement? = PsiTreeUtil.nextVisibleLeaf(commentOwner)
+                    // 支持同一行的--注释
+                    while (current != null && lineNumber == doc.getLineNumber(current.startOffset))
+                    {
+                        if (current is PsiComment && current !is LuaComment) {
+                            // 同一行的注释
+                            sb.append(current.text)
+                            break
+                        }
+                        current = PsiTreeUtil.nextVisibleLeaf(current)
+                    }
+                }
+
+            }
             return true
         }
 
@@ -225,10 +261,55 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
 
     private fun renderClassMember(sb: StringBuilder, classMember: LuaPsiTypeMember) {
         val context = SearchContext.get(classMember.project)
-        val parentType = (classMember.parent as? LuaTableExpr)?.shouldBe(context) ?: classMember.guessParentClass(context)
+        val tableExpr = classMember.parent as? LuaTableExpr
+        var parentType = tableExpr?.shouldBe(context) ?: classMember.guessParentClass(context)
 
         var memberRendered = false
 
+        // 优化变量提示，不显示结构
+        if (parentType is TyTable) {
+            var luaPsi: LuaPsiElement = parentType.psi;
+            var parent = luaPsi.parent
+            var parentName: String? = null
+            var tableIndexStr = "";
+            while (parentName == null) {
+                if (parent == null || parent is LuaPsiFile) {
+                    break
+                }
+                when(parent)
+                {
+                    is LuaTableField -> {
+                        parentName = parent.name
+                        if (parentName == null) {
+                            val indexName = parent.guessIndexType(context)?.displayName
+                            if (indexName!=null) {
+                                tableIndexStr = "$tableIndexStr[$indexName]"
+                            }
+                        }
+                    }
+                    is LuaPsiTypeMember ->{parentName = parent.name}
+                    is LuaLocalDefStat ->{parentName = parent.localDefList[0]?.name}
+                    is LuaAssignStat -> {parentName = parent.varExprList.text }
+                }
+                parent = parent.parent
+            }
+            if (parentName != null)
+            {
+                renderDefinition(sb)
+                {
+                    sb.append("<b>")
+                    sb.append("<code>")
+                    sb.append(parentName)
+                    if (tableIndexStr != "") {
+                        sb.append(tableIndexStr)
+                    }
+                    sb.append("</code>")
+                    sb.append("</b>")
+                }
+                parentType = null
+            }
+
+        }
         if (parentType != null) {
             Ty.eachResolved(context, parentType) {
                 memberRendered = renderClassMember(context, sb, it, classMember) || memberRendered
@@ -249,7 +330,7 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
             val withinImplementation = originalElement?.let { PsiTreeUtil.isAncestor(owner, it, true) } ?: false
             renderDocParam(sb, docParamDef, withinImplementation, tyRenderer, true)
         } else {
-            val context = originalElement?.let { PsiSearchContext(it ) } ?: SearchContext.get(paramDef.project)
+            val context = originalElement?.let { PsiSearchContext(it) } ?: SearchContext.get(paramDef.project)
             val ty = infer(context, paramDef) ?: Primitives.UNKNOWN
             sb.append("<b>param</b> <code>${paramDef.name}</code> : ")
             renderTy(sb, ty, tyRenderer)

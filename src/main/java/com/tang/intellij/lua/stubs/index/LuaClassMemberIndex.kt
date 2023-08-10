@@ -24,6 +24,7 @@ import com.intellij.psi.stubs.StringStubIndexExtension
 import com.intellij.psi.stubs.StubIndex
 import com.intellij.util.Processor
 import com.intellij.util.containers.ContainerUtil
+import com.tang.intellij.lua.psi.LuaIndexExpr
 import com.tang.intellij.lua.psi.LuaPsiTypeMember
 import com.tang.intellij.lua.psi.LuaTypeMethod
 import com.tang.intellij.lua.search.SearchContext
@@ -148,6 +149,14 @@ class LuaClassMemberIndex : StringStubIndexExtension<LuaPsiTypeMember>() {
 
             processAllIndexers(context, cls, deep) { _, member ->
                 val memberIndexerTy = member.guessIndexType(context)
+                // 23-06-30 20:58 teddysjwu: 这里会导致self[xxx]这类的优先级太高导致优先跳转，判断一下名字是否相等，不相等降低优先级
+                if (member is LuaIndexExpr) {
+                    val indexExpr = member as LuaIndexExpr
+                    val name = indexExpr.idExpr?.name
+                    if (name != fieldName) {
+                        return@processAllIndexers true;
+                    }
+                }
                 val candidateIndexerTy = memberIndexerTy?.let {
                     if (indexerSubstitutor != null) {
                         it.substitute(context, indexerSubstitutor)

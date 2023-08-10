@@ -39,6 +39,9 @@ import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
 class LuaCompletionContributor : CompletionContributor() {
     private var suggestWords = true
     init {
+        // 优先提示table结构变量
+        extend(CompletionType.BASIC, IN_TABLE_FIELD, TableCompletionProvider())
+
         //可以override
         extend(CompletionType.BASIC, SHOW_OVERRIDE, OverrideCompletionProvider())
 
@@ -72,8 +75,6 @@ class LuaCompletionContributor : CompletionContributor() {
         })
 
         extend(CompletionType.BASIC, IN_LOCAL_DEF_NAME, SuggestLocalNameProvider())
-
-        extend(CompletionType.BASIC, IN_TABLE_FIELD, TableCompletionProvider())
     }
 
     override fun fillCompletionVariants(parameters: CompletionParameters, result: CompletionResultSet) {

@@ -142,6 +142,14 @@ class LuaAnnotator : Annotator {
                     .create()
         }
 
+        // 增加参数着色
+        override fun visitParamDef(o: LuaParamDef) {
+            super.visitParamDef(o)
+            createInfoAnnotation(o.id, "Parameter : \"${o.name}\"")
+                .textAttributes(LuaHighlightingData.PARAMETER)
+                .create()
+        }
+
         override fun visitNameExpr(o: LuaNameExpr) {
             val id = o.id
 

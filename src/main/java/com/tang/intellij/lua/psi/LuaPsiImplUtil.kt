@@ -94,11 +94,12 @@ fun isStatic(classMethodDefStat: LuaClassMethodDefStat): Boolean {
 fun getPresentation(classMethodDefStat: LuaClassMethodDefStat): ItemPresentation {
     return object : ItemPresentation {
         override fun getPresentableText(): String? {
-            val type = classMethodDefStat.guessParentClass(SearchContext.get(classMethodDefStat.project))
-            if (type != null) {
-                val c = if (classMethodDefStat.isStatic) "." else ":"
-                return type.displayName + c + classMethodDefStat.name + classMethodDefStat.paramSignature
-            }
+            // 避免跳转项目符号显示结构
+//            val type = classMethodDefStat.guessParentClass(SearchContext.get(classMethodDefStat.project))
+//            if (type != null) {
+//                val c = if (classMethodDefStat.isStatic) "." else ":"
+//                return type.displayName + c + classMethodDefStat.name + classMethodDefStat.paramSignature
+//            }
             return classMethodDefStat.name!! + classMethodDefStat.paramSignature
         }
 

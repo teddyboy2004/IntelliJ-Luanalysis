@@ -19,6 +19,7 @@ package com.tang.intellij.lua.editor.structure
 import com.intellij.ide.util.treeView.smartTree.TreeElement
 import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.util.PsiTreeUtil
+import com.jetbrains.rd.util.remove
 import com.tang.intellij.lua.comment.psi.LuaDocTagClass
 import com.tang.intellij.lua.comment.psi.LuaDocTagField
 import com.tang.intellij.lua.comment.psi.LuaDocVisitor
@@ -167,6 +168,16 @@ class LuaStructureVisitor : LuaVisitor() {
             } else if (expr is LuaTableExpr) {
                 handleTableExpr(expr, child)
             }
+            // 处理 a = a or {}的情况
+            else if (expr is LuaBinaryExpr) {
+                for (e in expr.children) {
+                    if (e is LuaTableExpr) {
+                        handleTableExpr(e, child)
+                        break
+                    }
+
+                }
+            }
         }
     }
 
@@ -212,7 +223,11 @@ class LuaStructureVisitor : LuaVisitor() {
                         LuaLocalVarElement(tableField, name)
                     }
                 }
-
+                // 优化增加文件结构显示，显示多层
+                if(expr is LuaTableExpr)
+                {
+                    handleTableExpr(expr, child)
+                }
                 exprOwner.addChild(child)
             }
         }
@@ -253,6 +268,15 @@ class LuaStructureVisitor : LuaVisitor() {
 
             if (valueExpr is LuaTableExpr) {
                 handleTableExpr(valueExpr, exprOwner)
+            }
+            // 处理 a = a or {}的情况
+            else if (valueExpr is LuaBinaryExpr) {
+                for (e in valueExpr.children) {
+                    if (e is LuaTableExpr) {
+                        handleTableExpr(e, exprOwner)
+                        break
+                    }
+                }
             }
         }
     }
@@ -335,9 +359,49 @@ class LuaStructureVisitor : LuaVisitor() {
     }
 
     private fun compressChild(element: TreeElement) {
+        // 23-07-14 20:07 teddysjwu: 文件结构函数下面不显示本地变量
+        if (element is LuaFuncElement) {
+            // 显示函数下的self里的子节点，加到父节点
+            var children = element.children
+            var parent = element.parent
+            var list = ArrayList<LuaTreeElement>()
+            var parentChild = parent!!.children
+            for (it in children) {
+                if (it is LuaTreeElement && it.name == "self") {
+                    for (child in it.children) {
+                        list.add(child as LuaTreeElement)
+                    }
+                    break
+                }
+            }
+            element.clearChildren()
+            var index = parentChild.indexOf(element)
+            for (treeElement in list) {
+                val name = treeElement.name
+                var needAddChild = true
+                for ((i, e) in parentChild.withIndex()) {
+                    if (e is LuaTreeElement && e.name == name) {
+                        if (i > index) {
+                            parentChild = parentChild.remove(e)
+                            needAddChild = true
+                        }
+                        else
+                        {
+                            needAddChild = false
+                        }
+                        break
+                    }
+                }
+                if (needAddChild) {
+                    element.addChild(treeElement)
+                }
+            }
+            return
+        }
         if (element !is LuaVarElement) {
             return
         }
+
 
         val children = element.children
         if (children.size == 1) {

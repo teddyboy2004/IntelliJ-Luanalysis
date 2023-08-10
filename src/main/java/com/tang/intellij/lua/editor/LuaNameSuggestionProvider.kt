@@ -16,16 +16,19 @@
 
 package com.tang.intellij.lua.editor
 
+import com.intellij.lang.findUsages.LanguageFindUsages
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReference
 import com.intellij.psi.codeStyle.NameUtil
 import com.intellij.psi.codeStyle.SuggestedNameInfo
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.rename.NameSuggestionProvider
+import com.tang.intellij.lua.lang.LuaLanguage
 import com.tang.intellij.lua.psi.*
+import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.ty.*
-import java.util.*
 
 /**
  *
@@ -115,13 +118,44 @@ class LuaNameSuggestionProvider : NameSuggestionProvider {
             val type = psi.guessType(context)
             if (type != null) {
                 val names = HashSet<String>()
-
-                TyUnion.each(type) { ty ->
+                 TyUnion.each(type) { ty ->
                     collectNames(context, ty) { name, suffix, preferLonger ->
+                        // 避免出现错误提示
+                        if (name.contains(":")) {
+                            return@collectNames
+                        }
                         if (names.add(name)) {
                             val strings = NameUtil.getSuggestionsByName(name, "", suffix, false, preferLonger, false)
                             set.addAll(strings)
                         }
+                    }
+                }
+                // 优化变量名提示
+                if (set.isEmpty()) {
+                    if (type is TyLazySubstitutedTable) {
+                        val defStat = PsiTreeUtil.getParentOfType(type.psi, LuaLocalDefStat::class.java)
+                        val name = defStat?.localDefList?.get(0)?.name
+                        if (name != null) {
+                            set.add(name)
+                        }
+
+                    }
+                    if (psi is LuaLocalDef) {
+                        val parent = PsiTreeUtil.getParentOfType(psi, LuaLocalDefStat::class.java)
+                        val last = parent?.exprList?.lastChild
+                        if (last is LuaIndexExpr) {
+                            set.add(last.name.toString());
+                        } else if (last is LuaNameExpr) {
+                            set.add(last.text)
+                        }
+                    }
+                    val wordsScanner = LanguageFindUsages.INSTANCE.forLanguage(LuaLanguage.INSTANCE).wordsScanner
+                    wordsScanner?.processWords(psi.containingFile.text) {
+                        val word = it.baseText.subSequence(it.start, it.end).toString()
+                        if (word.length > 2 && LuaRefactoringUtil.isLuaIdentifier(word)) {
+                            set.add(word)
+                        }
+                        true
                     }
                 }
             }

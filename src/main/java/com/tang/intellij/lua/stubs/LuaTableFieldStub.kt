@@ -24,11 +24,8 @@ import com.intellij.psi.stubs.StubOutputStream
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.BitUtil
 import com.intellij.util.io.StringRef
-import com.tang.intellij.lua.psi.LuaTableExpr
-import com.tang.intellij.lua.psi.LuaTableField
-import com.tang.intellij.lua.psi.Visibility
+import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.psi.impl.LuaTableFieldImpl
-import com.tang.intellij.lua.psi.shouldCreateStub
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.stubs.index.LuaClassMemberIndex
 import com.tang.intellij.lua.stubs.index.StubKeys
@@ -129,8 +126,18 @@ class LuaTableFieldType : LuaStubElementType<LuaTableFieldStub, LuaTableField>("
     }
 
     override fun indexStub(fieldStub: LuaTableFieldStub, indexSink: IndexSink) {
-        val className = fieldStub.className ?: return
+        var className = fieldStub.className ?: return
         val fieldName = fieldStub.name
+        // 如果这个有定义@class会导致两个变量断开，找doc class的名称
+        var parentStub = fieldStub.parentStub
+        while (parentStub != null)
+        {
+            if(parentStub.stubType == LuaElementTypes.LOCAL_DEF_STAT && parentStub.childrenStubs[0].stubType == LuaElementType.CLASS_DEF)
+            {
+                className = (parentStub.childrenStubs[0] as LuaDocTagClassStub).className
+            }
+            parentStub = parentStub.parentStub
+        }
 
         if (fieldName != null) {
             LuaClassMemberIndex.indexMemberStub(indexSink, className, fieldName)

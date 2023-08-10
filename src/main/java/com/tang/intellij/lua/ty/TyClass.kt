@@ -22,6 +22,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.stubs.StubInputStream
 import com.intellij.psi.stubs.StubOutputStream
+import com.intellij.psi.util.childrenOfType
 import com.intellij.util.Processor
 import com.intellij.util.io.StringRef
 import com.tang.intellij.lua.Constants
@@ -348,7 +349,9 @@ abstract class TyClass(override val className: String,
             if (classDef != null) {
                 val tyClass = classDef.type
                 aliasName = tyClass.aliasName
-                superClass = tyClass.superClass
+                if (tyClass.superClass != this) {
+                    superClass = tyClass.superClass
+                }
                 params = tyClass.params
                 flags = tyClass.flags
                 signatures = tyClass.signatures
@@ -671,6 +674,20 @@ open class TyTable(override val psi: LuaTableExpr, name: String = getTableTypeNa
         this.flags = TyFlags.ANONYMOUS_TABLE or TyFlags.SHAPE
     }
 
+    override fun findMember(context: SearchContext, name: String): TypeMember? {
+        val findMember = super.findMember(context, name)
+        // 23-07-04 11:46 teddysjwu: 找不到的情况下，做一下兜底
+        if (findMember == null) {
+            var stats = this.psi.containingFile.childrenOfType<LuaClassMethodDefStat>()
+            for (stat in stats) {
+                if (stat.name == name) {
+                    return stat;
+                }
+            }
+        }
+        return findMember
+    }
+
     override fun willResolve(context: SearchContext): Boolean {
         return false
     }
@@ -768,7 +785,8 @@ fun getSubstitutedDocTableTypeName(table: LuaDocTableDef): String {
 }
 
 fun getSubstitutedTableTypeName(context: SearchContext, table: LuaTableExpr, substitutor: ITySubstitutor): String {
-    return "${getTableTypeName(table)}:${context.identifier}:${substitutor.name}"
+    // 避免找不到变量定义
+    return "${getTableTypeName(table)}"
 }
 
 

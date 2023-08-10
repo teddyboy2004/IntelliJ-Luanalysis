@@ -16,6 +16,7 @@
 
 package com.tang.intellij.lua.ty
 
+import com.intellij.codeInspection.bytecodeAnalysis.ClassDataIndexer
 import com.intellij.psi.PsiElement
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.PsiTreeUtil
@@ -30,6 +31,7 @@ import com.tang.intellij.lua.psi.impl.LuaNameExprMixin
 import com.tang.intellij.lua.search.PsiSearchContext
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.search.withSearchGuard
+import com.tang.intellij.lua.stubs.index.LuaClassIndex
 
 fun inferExpr(context: SearchContext, expression: LuaExpression<*>): ITy? {
     if (expression.comment != null) {
@@ -176,7 +178,8 @@ private fun guessAndOrType(context: SearchContext, binaryExpr: LuaBinaryExpr, op
     val lty = context.withIndex(0) { infer(context, lhs) }
 
     if (lty == null) {
-        return null
+        // 优化类型判断
+        return context.withIndex(0) { infer(context, rhs) }
     }
 
     //and
@@ -371,6 +374,9 @@ private fun LuaNameExpr.infer(context: SearchContext): ITy? {
             }
         }
     }
+    if (name == Constants.WORD_G) {
+        return TyClass.G
+    }
 
     var ty = withSearchGuard(this) {
         val multiResolve = multiResolve(context, this)
@@ -499,6 +505,21 @@ private fun LuaIndexExpr.infer(context: SearchContext): ITy? {
 
 private fun guessFieldType(context: SearchContext, indexExpr: LuaIndexExpr, ty: ITy): ITy? {
     val fieldName = indexExpr.name
+    // 23-07-03 10:57 teddysjwu: 增加__super类型判断处理
+    if (fieldName == "__super") {
+        val prefixType = context.withIndex(0) {
+            indexExpr.guessParentType(context)
+        }
+        if (prefixType is TyUnion) {
+            val find = indexExpr.nameExpr?.text?.let { LuaClassIndex.find(context, it) }
+            if (find != null) {
+                return find.superClass?.getType();
+            }
+        }
+        else {
+            return prefixType.getSuperType(context)
+        }
+    }
     val indexTy = indexExpr.idExpr?.guessType(context)
 
     // _G.var = {}  <==>  var = {}

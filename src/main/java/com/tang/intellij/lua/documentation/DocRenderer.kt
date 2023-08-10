@@ -239,7 +239,8 @@ fun renderDocParam(sb: StringBuilder, param: LuaDocTagParam, withinImplementatio
 
 fun renderCommentString(prefix: String?, postfix: String?, sb: StringBuilder, child: LuaDocCommentString?) {
     child?.string?.text?.let {
-        sb.wrap("<div class='content'>", "</div>") {
+        // docFiled显示不换行
+        sb.wrap("", "") {
             if (prefix != null) sb.append(prefix)
             var html = markdownToHtml(it)
             if (html.startsWith("<p>"))

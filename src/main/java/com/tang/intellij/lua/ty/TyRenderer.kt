@@ -16,7 +16,16 @@
 
 package com.tang.intellij.lua.ty
 
+import com.intellij.openapi.project.Project
+import com.intellij.psi.PsiComment
+import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.PsiElement
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.refactoring.suggested.startOffset
 import com.tang.intellij.lua.Constants
+import com.tang.intellij.lua.comment.psi.LuaDocTagField
+import com.tang.intellij.lua.comment.psi.api.LuaComment
+import com.tang.intellij.lua.psi.LuaCommentOwner
 import com.tang.intellij.lua.search.SearchContext
 
 interface ITyRenderer {
@@ -35,7 +44,7 @@ private val MaxSingleLineGenericParams = 5;
 private fun joinSingleLineOrWrap(list: Collection<String>, maxOnLine: Int, divider: String, prefix: String = "", suffix: String = "", spaceWrapItems: Boolean = prefix.isNotEmpty()): String {
     return if (list.size == 0) {
         prefix + suffix
-    } else if (list.size <= maxOnLine) {
+    } else if (list.size <= maxOnLine && false) { // 都垂直显示
         list.joinToString(divider + " ", if (spaceWrapItems) prefix + " " else prefix, if (spaceWrapItems) " " + suffix else suffix)
     } else {
         list.joinToString(divider + "\n  ", prefix + "\n  ", "\n" + suffix)
@@ -43,6 +52,7 @@ private fun joinSingleLineOrWrap(list: Collection<String>, maxOnLine: Int, divid
 }
 
 open class TyRenderer : TyVisitor(), ITyRenderer {
+    var showStructComment: Boolean = false // 用于判断是否渲染defintion
     private var visitedTys = ThreadLocal.withInitial { mutableSetOf<ITy>() }
 
     private fun withRecursionGuard(ty: ITy, sb: StringBuilder, block: () -> Unit) {
@@ -316,25 +326,10 @@ open class TyRenderer : TyVisitor(), ITyRenderer {
                     }
                 }
 
-                val context = SearchContext.get(clazz.psi.project)
-                val list = mutableListOf<String>()
-                clazz.processMembers(context) { owner, member ->
-                    val name = member.name
-                    val indexTy = if (name == null) member.guessIndexType(context) else null
-                    val key = name ?: "[${render(indexTy ?: Primitives.VOID)}]"
-                    member.guessType(context).let { fieldTy ->
-                        val renderedFieldTy = render(fieldTy ?: Primitives.UNKNOWN)
-
-                        list.add(if (isMemberPunctuationRequired(fieldTy)) {
-                            "${key}: (${renderedFieldTy})"
-                        } else {
-                            "${key}: ${renderedFieldTy}"
-                        })
-                    }
-                    list.size < MaxRenderedTableMembers
-                }
-
-                joinSingleLineOrWrap(list, MaxSingleLineTableMembers, ",", "{", "}")
+                renderClassMember(clazz)
+            }
+            clazz is TyPsiDocClass && this.showStructComment ->{
+                renderClassMember(clazz)
             }
             clazz.isAnonymous -> {
                 if (isSuffixedClass(clazz)) {
@@ -346,6 +341,79 @@ open class TyRenderer : TyVisitor(), ITyRenderer {
             clazz.isGlobal -> "[global ${clazz.varName}]"
             else -> "${clazz.className}${renderGenericParams(clazz.params?.map { it.toString() })}"
         }
+    }
+
+    // 优化类成员提示，增加显示注释
+    fun renderClassMember(clazz: TyClass): String {
+        var proj: Project? = null
+        if (clazz is TyTable) {
+            proj = clazz.psi.project
+        }
+        else if(clazz is TyPsiDocClass)
+        {
+            proj = clazz.psi.project
+        }
+        var className = "table"
+        if (!clazz.className.startsWith("table@")) {
+            className = clazz.className
+        }
+        if (proj == null) {
+            return className
+        }
+        val context = SearchContext.get(proj)
+        val list = mutableListOf<String>()
+        clazz.processMembers(context) { owner, member ->
+            val name = member.name
+            val indexTy = if (name == null) member.guessIndexType(context) else null
+            val key = name ?: "[${render(indexTy ?: Primitives.VOID)}]"
+            member.guessType(context).let { fieldTy ->
+                val renderedFieldTy = render(fieldTy ?: Primitives.UNKNOWN)
+
+                var comment = StringBuilder()
+                if (member is LuaCommentOwner) {
+                    if (member.comment != null) {
+                        var child = member.comment
+                        comment.append(child!!.text)
+                    } else {
+                        val doc = PsiDocumentManager.getInstance(context.project).getDocument(member.containingFile)
+                        if (doc != null) {
+                            val lineNumber = doc.getLineNumber(member.startOffset)
+                            var current: PsiElement? = PsiTreeUtil.nextVisibleLeaf(member)
+                            // 支持同一行的--注释
+                            while (current != null && lineNumber == doc.getLineNumber(current.startOffset))
+                            {
+                                if (current is PsiComment && current !is LuaComment) {
+                                    // 同一行的注释
+                                    comment.append(current.text)
+                                    break
+                                }
+                                current = PsiTreeUtil.nextVisibleLeaf(current)
+                            }
+                        }
+                    }
+                }
+                if(member is LuaDocTagField)
+                {
+
+                }
+                if (comment.isEmpty())
+                {
+                    comment.append(",")
+                }
+                else
+                {
+                    comment.insert(0, ", ")
+                }
+                list.add(if (isMemberPunctuationRequired(fieldTy)) {
+                    "${key}: (${renderedFieldTy})${comment.toString()}"
+                } else {
+                    "${key}: ${renderedFieldTy}${comment.toString()}"
+                })
+            }
+            list.size < MaxRenderedTableMembers
+        }
+
+        return "$className ${joinSingleLineOrWrap(list, MaxSingleLineTableMembers, " ", "{", "}")}"
     }
 
     open fun renderTypeName(t: String): String {

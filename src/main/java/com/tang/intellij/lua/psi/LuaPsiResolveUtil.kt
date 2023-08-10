@@ -22,9 +22,11 @@ import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 import com.tang.intellij.lua.Constants
 import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.stubs.index.LuaClassIndex
 import com.tang.intellij.lua.stubs.index.LuaClassMemberIndex
 import com.tang.intellij.lua.ty.ITyClass
 import com.tang.intellij.lua.ty.ITyGeneric
+import com.tang.intellij.lua.ty.TyUnion
 
 fun resolveLocal(context: SearchContext?, ref: LuaNameExpr) = resolveLocal(context, ref.name, ref)
 
@@ -111,8 +113,13 @@ fun multiResolve(context: SearchContext, ref: LuaNameExpr): Array<PsiElement> {
     if (resolveResult != null) {
         list.add(resolveResult)
     } else {
-        val refName = ref.name
+        var refName = ref.name
         val module = ref.getModuleName(context) ?: Constants.WORD_G
+        // 优化查找全局变量
+        if(refName == Constants.WORD_G)
+        {
+            refName = ""
+        }
         LuaClassMemberIndex.processNamespaceMember(context, module, refName) {
             list.add(it)
             true
@@ -166,6 +173,24 @@ fun resolve(context: SearchContext, indexExpr: LuaIndexExpr, memberName: String)
     val type = indexExpr.guessParentType(context)
     var ret: PsiElement? = null
 
+    // 23-07-03 11:04 teddysjwu: 增加__super跳转
+    if (memberName == "__super") {
+        if (type is TyUnion) {
+            val find = indexExpr.nameExpr?.name?.let { LuaClassIndex.find(context, it) }
+            if (find != null) {
+                val superClass = find.superClass
+                if (superClass != null) {
+                    return LuaClassIndex.find(context, superClass.text);
+                }
+            }
+        } else {
+            val superType = type.getSuperType(context)
+            if (superType != null) {
+                return LuaClassIndex.find(context, superType.displayName)
+            }
+        }
+    }
+
     type.eachTopClass { ty ->
         val cls = (if (ty is ITyGeneric) ty.base else ty) as? ITyClass
         ret = cls?.findMember(context, memberName)?.psi
@@ -177,7 +202,7 @@ fun resolve(context: SearchContext, indexExpr: LuaIndexExpr, memberName: String)
         val declaration = tree.find(indexExpr)
 
         if (declaration != null) {
-            return declaration.psi
+           return declaration.psi
         }
     }
 
