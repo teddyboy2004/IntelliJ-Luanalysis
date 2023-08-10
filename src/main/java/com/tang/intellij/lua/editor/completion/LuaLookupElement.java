@@ -156,7 +156,11 @@ public abstract class LuaLookupElement extends LookupElement implements Comparab
         presentation.setItemTextBold(isBold);
         // 23-07-14 11:19 teddysjwu: 提示不显示结构，没有用
 //        presentation.setTailText(getTailText(), true);
-        presentation.setTypeText(getTypeText(), getTypeIcon());
+        String typeText = getTypeText();
+        if (typeText.startsWith("table")) {
+            typeText = "table";
+        }
+        presentation.setTypeText(typeText, getTypeIcon());
         presentation.setIcon(getIcon());
     }
 

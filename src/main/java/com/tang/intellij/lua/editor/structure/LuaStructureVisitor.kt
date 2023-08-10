@@ -365,7 +365,6 @@ class LuaStructureVisitor : LuaVisitor() {
             var children = element.children
             var parent = element.parent
             var list = ArrayList<LuaTreeElement>()
-            var parentChild = parent!!.children
             for (it in children) {
                 if (it is LuaTreeElement && it.name == "self") {
                     for (child in it.children) {
@@ -375,6 +374,11 @@ class LuaStructureVisitor : LuaVisitor() {
                 }
             }
             element.clearChildren()
+            if(parent == null || list.isEmpty())
+            {
+                return
+            }
+            var parentChild = parent.children
             var index = parentChild.indexOf(element)
             for (treeElement in list) {
                 val name = treeElement.name

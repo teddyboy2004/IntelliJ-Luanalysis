@@ -84,6 +84,10 @@ class FindMethodUsagesHandler(val classMethod: LuaTypeMethod<*>) : FindUsagesHan
             ApplicationManager.getApplication().runReadAction {
                 val query = MergeQuery(LuaOverridingMethodsSearch.search(classMethod), LuaOverridenMethodsSearch.search(classMethod))
                 query.forEach {
+                    // 跳过函数自己引用自己
+                    if (it == classMethod) {
+                        return@forEach
+                    }
                     val identifier = it.nameIdentifier
                     if (identifier != null)
                         processor.process(UsageInfo(identifier))
