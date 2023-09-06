@@ -29,7 +29,10 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.TokenType
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.elementType
 import com.tang.intellij.lua.project.LuaSettings
+import com.tang.intellij.lua.psi.LuaClassMethodDefStat
+import com.tang.intellij.lua.psi.LuaClassMethodName
 import com.tang.intellij.lua.psi.LuaExpression
 import com.tang.intellij.lua.psi.LuaParamInfo
 import com.tang.intellij.lua.psi.LuaTypes
@@ -73,6 +76,11 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
                 if (tokenType === LuaTypes.LPAREN) {
                     needAppendPar = prevIteratorEnd != insertionContext.tailOffset
                 }
+            }
+
+            // 增加判断函数是否使用:，并且前面使用点自动更换成:
+            if (lookupElement.psiElement is LuaClassMethodDefStat && (lookupElement.psiElement as LuaClassMethodDefStat).classMethodName.colon != null && element.prevSibling.elementType == LuaTypes.DOT) {
+                editor.document.replaceString(startOffset - 1, startOffset, ":")
             }
         }
 

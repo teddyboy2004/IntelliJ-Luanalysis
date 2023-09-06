@@ -16,10 +16,11 @@
 
 package com.tang.intellij.lua.ty
 
-import com.intellij.codeInspection.bytecodeAnalysis.ClassDataIndexer
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiReference
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.refactoring.suggested.startOffset
 import com.tang.intellij.lua.Constants
 import com.tang.intellij.lua.comment.psi.impl.LuaDocTagNotImpl
 import com.tang.intellij.lua.comment.psi.impl.LuaDocTagTypeImpl
@@ -32,6 +33,7 @@ import com.tang.intellij.lua.search.PsiSearchContext
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.search.withSearchGuard
 import com.tang.intellij.lua.stubs.index.LuaClassIndex
+
 
 fun inferExpr(context: SearchContext, expression: LuaExpression<*>): ITy? {
     if (expression.comment != null) {
@@ -325,11 +327,71 @@ private fun LuaCallExpr.infer(): ITy? {
     // require('module') resolution
     // TODO: Lazy module type like TyLazyClass, but with file paths for use when context.isDumb
     if (!context.isDumb && expr is LuaNameExpr && LuaSettings.isRequireLikeFunctionName(expr.name)) {
-        return (luaCallExpr.firstStringArg as? LuaLiteralExpr)?.stringValue?.let {
-            resolveRequireFile(it, luaCallExpr.project)
-        }?.let {
-            context.withMultipleResults {
-                it.guessType(context)
+        var stringValue = (luaCallExpr.firstStringArg as? LuaLiteralExpr)?.stringValue
+        // 支持处理require(a.b)形式
+        if(stringValue == null) {
+            val args = luaCallExpr.args
+            var psi: LuaPsiElement? = null
+            when (args) {
+                is LuaSingleArg -> {
+                    psi = args.expression.psi
+                }
+
+                is LuaListArgs -> args.expressionList.let { list ->
+                    if (list.isNotEmpty()) {
+                        psi = list[list.size - 1].psi
+                    }
+                }
+            }
+            if (psi != null) {
+                if(psi is LuaIndexExpr)
+                {
+                    val nameExpr = (psi as LuaIndexExpr).nameExpr
+                    val infer = nameExpr?.infer(context)
+                    if (infer is TyTable) {
+                        val text = (psi as LuaIndexExpr).id?.text
+                        if (text != null) {
+                            infer.psi.tableFieldList.forEach(){
+                                if (it.name == text) {
+                                    val guessType = it.guessType(context)
+                                    if (guessType is TyPrimitiveLiteral) {
+                                        stringValue = guessType.value
+                                    }
+                                }
+                                false
+                            }
+                        }
+                    }
+                }
+                if(stringValue == null)
+                {
+                    val last = PsiTreeUtil.getDeepestLast(psi!!)
+                    val file = last.containingFile
+                    val ref: PsiReference? = file.findReferenceAt(last.startOffset)
+
+                    if (ref != null && ref != psi) {
+                        val targetElement = ref.element
+                        if (targetElement is LuaPsiTypeMember) {
+                            val type = targetElement.guessType(context)
+                            if (type is TyPrimitiveLiteral)
+                            {
+                                stringValue = type.value
+                            }
+                        }
+                    }
+                }
+
+
+            }
+        }
+        if (stringValue!= null)
+        {
+            return stringValue.let {
+                resolveRequireFile(it, luaCallExpr.project)
+            }?.let {
+                context.withMultipleResults {
+                    it.guessType(context)
+                }
             }
         }
     }

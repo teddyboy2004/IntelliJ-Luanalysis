@@ -238,13 +238,24 @@ fun renderDocParam(sb: StringBuilder, param: LuaDocTagParam, withinImplementatio
 }
 
 fun renderCommentString(prefix: String?, postfix: String?, sb: StringBuilder, child: LuaDocCommentString?) {
-    child?.string?.text?.let {
+    var text = child?.string?.text
+    // 处理return tag的显示问题
+    if (text != null && child?.parent is LuaDocTagReturn)
+    {
+        var index = text.indexOf("$");
+        if(index != -1)
+        {
+            text = text.substring(0, index)
+        }
+    }
+    text?.let {
         // docFiled显示不换行
         sb.wrap("", "") {
             if (prefix != null) sb.append(prefix)
             var html = markdownToHtml(it)
-            if (html.startsWith("<p>"))
-                html = html.substring(3, html.length - 4)
+            if (html.startsWith("<p>")) {
+            }
+            html = html.substring(3, html.length - 4)
             sb.append(html)
             if (postfix != null) sb.append(postfix)
         }

@@ -72,10 +72,13 @@ class LuaIndexExprType : LuaStubElementType<LuaIndexExprStub, LuaIndexExpr>("IND
             }
 
             val isSelf = (indexExpr.expressionList.firstOrNull() as? LuaNameExpr)?.name == Constants.WORD_SELF
-
             TyUnion.each(ty) {
                 if (it is ITyClass && it !is ITyPrimitive && (isSelf || it !is TySerializedClass)) {
                     classNameSet.add(it.className)
+                }
+                else if((indexExpr.expressionList.firstOrNull() as? LuaNameExpr)?.name == Constants.WORD_G) // 支持_G.xxx = xxx 跳转
+                {
+                    classNameSet.add(Constants.WORD_G)
                 }
             }
         }

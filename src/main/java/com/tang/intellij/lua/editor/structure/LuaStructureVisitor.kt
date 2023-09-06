@@ -190,7 +190,7 @@ class LuaStructureVisitor : LuaVisitor() {
 
         val args = callExpr?.args as? LuaListArgs
 
-        args?.expressionList?.forEach{ arg ->
+        args?.expressionList?.forEach { arg ->
             if (arg is LuaClosureExpr) {
                 val elem = LuaLocalFuncElement(arg, "<anonymous>", arg.paramSignature)
 
@@ -224,8 +224,7 @@ class LuaStructureVisitor : LuaVisitor() {
                     }
                 }
                 // 优化增加文件结构显示，显示多层
-                if(expr is LuaTableExpr)
-                {
+                if (expr is LuaTableExpr) {
                     handleTableExpr(expr, child)
                 }
                 exprOwner.addChild(child)
@@ -374,8 +373,7 @@ class LuaStructureVisitor : LuaVisitor() {
                 }
             }
             element.clearChildren()
-            if(parent == null || list.isEmpty())
-            {
+            if (parent == null || list.isEmpty()) {
                 return
             }
             var parentChild = parent.children
@@ -384,28 +382,46 @@ class LuaStructureVisitor : LuaVisitor() {
                 val name = treeElement.name
                 var needAddChild = true
                 for ((i, e) in parentChild.withIndex()) {
-                    if (e is LuaTreeElement && e.name == name) {
-                        if (i > index) {
+                    if (i == index)
+                    {
+                        continue
+                    } else if (i > index) {
+                        if (e is LuaTreeElement && e.name == name) {
                             parentChild = parentChild.remove(e)
                             needAddChild = true
+                            break
                         }
-                        else
-                        {
+                    } else {
+                        if (e is LuaTreeElement && e.name == name) {
                             needAddChild = false
+                            break
                         }
-                        break
+                        else if(e is LuaFuncElement) {
+                            e.children.forEach { c ->
+                                if ((c is LuaVarElement) && c.name == name) {
+                                    needAddChild = false
+                                    return
+                                }
+                            }
+                            if (!needAddChild) {
+                                break
+                            }
+                        }
                     }
                 }
                 if (needAddChild) {
                     element.addChild(treeElement)
                 }
             }
+            parent.clearChildren()
+            for (treeElement in parentChild) {
+                parent.addChild(treeElement as LuaTreeElement)
+            }
             return
         }
         if (element !is LuaVarElement) {
             return
         }
-
 
         val children = element.children
         if (children.size == 1) {

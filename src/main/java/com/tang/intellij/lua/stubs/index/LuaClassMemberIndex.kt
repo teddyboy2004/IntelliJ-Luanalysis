@@ -278,7 +278,7 @@ class LuaClassMemberIndex : StringStubIndexExtension<LuaPsiTypeMember>() {
                 return true
             }
 
-            val key = "$namespace*$memberName"
+            val key = if (memberName.isNotEmpty())  "$namespace*$memberName" else namespace
 
             val members = LuaClassMemberIndex.instance.get(key, context.project, context.scope)
             return ContainerUtil.process(members, processor)

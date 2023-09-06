@@ -17,8 +17,10 @@
 package com.tang.intellij.lua.ty
 
 import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.lang.Language
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.stubs.StubInputStream
 import com.intellij.psi.stubs.StubOutputStream
 import com.intellij.util.Processor
@@ -479,7 +481,8 @@ fun ITy.matchSignature(context: SearchContext, call: LuaCallExpr, processProblem
                 signatureProblems?.forEach(processProblem)
             }
 
-            return SignatureMatchResult(candidate, signature, signature.returnTy ?: TyMultipleResults(listOf(Primitives.UNKNOWN), true))
+            val returnTy = signature.returnTy
+            return SignatureMatchResult(candidate, signature, returnTy ?: TyMultipleResults(listOf(Primitives.UNKNOWN), true))
         }
 
         if (fallbackReturnTy == null && signature.returnTy != Primitives.VOID) {

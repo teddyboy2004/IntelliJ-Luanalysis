@@ -20,6 +20,8 @@ import com.intellij.ide.structureView.StructureViewTreeElement
 import com.intellij.ide.util.treeView.smartTree.TreeElement
 import com.intellij.navigation.ItemPresentation
 import com.intellij.navigation.NavigationItem
+import com.tang.intellij.lua.psi.LuaPsiElement
+import com.tang.intellij.lua.psi.LuaTableField
 import javax.swing.Icon
 
 /**
@@ -27,6 +29,7 @@ import javax.swing.Icon
  */
 open class LuaTreeElement(val element: NavigationItem, var name: String, val icon: Icon) : StructureViewTreeElement {
     var parent: LuaTreeElement? = null
+    var inherited: Boolean = false
     private val children = LinkedHashMap<String, LuaTreeElement>()
 
     open fun getPresentableText(): String? {
@@ -44,6 +47,12 @@ open class LuaTreeElement(val element: NavigationItem, var name: String, val ico
             }
 
             override fun getLocationString(): String? {
+                if (this@LuaTreeElement.inherited) {
+                    val item = this@LuaTreeElement.element
+                    if (item is LuaPsiElement) {
+                        return item.containingFile.name
+                    }
+                }
                 return null
             }
 

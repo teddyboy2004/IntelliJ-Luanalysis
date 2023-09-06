@@ -132,9 +132,17 @@ class LuaTableFieldType : LuaStubElementType<LuaTableFieldStub, LuaTableField>("
         var parentStub = fieldStub.parentStub
         while (parentStub != null)
         {
-            if(parentStub.stubType == LuaElementTypes.LOCAL_DEF_STAT && parentStub.childrenStubs[0].stubType == LuaElementType.CLASS_DEF)
+            // 不超过多层
+            if (parentStub.stubType == LuaElementType.TABLE_FIELD)
             {
-                className = (parentStub.childrenStubs[0] as LuaDocTagClassStub).className
+                break
+            }
+            if((parentStub.stubType == LuaElementTypes.EXPR_LIST))
+            {
+                if(parentStub.parentStub.childrenStubs[0].stubType == LuaElementType.CLASS_DEF) {
+                    className = (parentStub.parentStub.childrenStubs[0] as LuaDocTagClassStub).className
+                }
+                break
             }
             parentStub = parentStub.parentStub
         }

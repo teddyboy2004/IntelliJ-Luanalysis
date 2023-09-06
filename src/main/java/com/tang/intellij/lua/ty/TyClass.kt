@@ -259,6 +259,31 @@ abstract class TyClass(override val className: String,
             members.addAll(classMembers)
         }
 
+        // 处理同时存在tablefield和luaIndex的情况下的去重，优先显示tablefield
+        val tableFields = mutableListOf<LuaTableField>()
+        val luaIndexExprs = mutableListOf<LuaIndexExpr>()
+        for (member in members) {
+            if (member is LuaTableField) {
+                tableFields.add(member)
+            }
+            else if (member is LuaIndexExpr)
+            {
+                luaIndexExprs.add(member)
+            }
+        }
+
+        for (tableField in tableFields) {
+            var indexTy = tableField.guessIndexType(context)
+            for (luaIndexExpr in luaIndexExprs) {
+                if (luaIndexExpr.guessIndexType(context) == indexTy)
+                {
+                    members.remove(luaIndexExpr)
+                    luaIndexExprs.remove(luaIndexExpr)
+                    break
+                }
+            }
+        }
+
         for (member in members) {
             ProgressManager.checkCanceled()
 

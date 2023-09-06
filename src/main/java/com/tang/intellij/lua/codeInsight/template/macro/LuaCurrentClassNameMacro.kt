@@ -23,14 +23,14 @@ import com.intellij.psi.PsiFile
 import com.tang.intellij.lua.codeInsight.template.context.LuaFunContextType
 import com.tang.intellij.lua.psi.*
 
-class LuaCurrentFunctionNameMacro : Macro() {
-    override fun getPresentableName() = "LuaCurrentFunctionName()"
+class LuaCurrentClassNameMacro : Macro() {
+    override fun getPresentableName() = "LuaCurrentClassName()"
 
-    override fun getName() = "LuaCurrentFunctionName"
+    override fun getName() = "LuaCurrentClassName"
 
-    fun removeClassName(classMethodName: String): String
+    fun removeFunction(classMethodName: String): String
     {
-        return classMethodName.replace(Regex(".*[.:]"), "")
+        return classMethodName.replace(Regex("[.:].*"), "")
     }
 
     override fun calculateResult(expressions: Array<out Expression>, context: ExpressionContext?): Result? {
@@ -40,10 +40,8 @@ class LuaCurrentFunctionNameMacro : Macro() {
             when (e) {
                 is LuaClassMethodDefStat -> {
                     var classMethodName = e.classMethodName.text
-                    return TextResult(removeClassName(classMethodName))
+                    return TextResult(removeFunction(classMethodName))
                 }
-                is LuaFuncDefStat -> return TextResult(e.name ?: "")
-                is LuaLocalFuncDefStat -> return TextResult(e.name ?: "")
             }
         }
         return null
@@ -58,11 +56,8 @@ class LuaCurrentFunctionNameMacro : Macro() {
                 is LuaClassMethodDefStat ->
                     {
                         var classMethodName = e.classMethodName.text
-                        list.add(LookupElementBuilder.create(removeClassName(classMethodName)))
-                        list.add(LookupElementBuilder.create(classMethodName))
+                        list.add(LookupElementBuilder.create(removeFunction(classMethodName)))
                 }
-                is LuaFuncDefStat -> e.name?.let { list.add(LookupElementBuilder.create(it)) }
-                is LuaLocalFuncDefStat -> e.name?.let { list.add(LookupElementBuilder.create(it)) }
             }
         }
         return list.toTypedArray()

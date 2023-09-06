@@ -16,14 +16,19 @@
 
 package com.tang.intellij.lua.ty
 
+import com.intellij.lang.Language
+import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.stubs.StubInputStream
 import com.intellij.psi.stubs.StubOutputStream
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.io.StringRef
 import com.tang.intellij.lua.comment.psi.LuaDocGenericDef
 import com.tang.intellij.lua.comment.psi.LuaDocGenericTableTy
-import com.tang.intellij.lua.psi.LuaScopedTypeTree
-import com.tang.intellij.lua.psi.getFileIdentifier
+import com.tang.intellij.lua.comment.psi.LuaDocTagClass
+import com.tang.intellij.lua.psi.*
+import com.tang.intellij.lua.search.ProjectSearchContext
 import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.stubs.index.LuaClassIndex
 import com.tang.intellij.lua.stubs.readTyNullable
 import com.tang.intellij.lua.stubs.writeTyNullable
 
@@ -57,6 +62,8 @@ class TyGenericParameter(name: String, val scopeName: String?, override val varN
 
         return super.equals(context, other, equalityFlags)
     }
+
+    var returnExpr:String = ""
 
     override val kind: TyKind
         get() = TyKind.GenericParam
@@ -94,9 +101,60 @@ class TyGenericParameter(name: String, val scopeName: String?, override val varN
     }
 
     override fun substitute(context: SearchContext, substitutor: ITySubstitutor): ITy {
-        val substitutedTy = super.substitute(context, substitutor)
+        var substitutedTy = super.substitute(context, substitutor)
 
         if (substitutedTy !== this) {
+            // 特殊处理$返回
+            if (returnExpr != "" && substitutedTy is TyTable)
+            {
+                if(returnExpr.indexOf("requireField:")!=-1)
+                {
+                    val fileName = returnExpr.replace("requireField:", "").trim()
+                    val member = substitutedTy.findMember(context, fileName)
+                    val guessType = member?.guessType(context)
+                    if (guessType is TyPrimitiveLiteral)
+                    {
+                        val value = guessType.value
+                        val find = LuaClassIndex.find(context, value.replace(Regex(".*[\\.\\\\]"),""))
+                        if (find != null)
+                        {
+                            substitutedTy = find.type
+                        }
+                        else
+                        {
+                            val file = resolveRequireFile(value, context.project)
+
+                            if (file != null)
+                            {
+                                var child = PsiTreeUtil.findChildOfType(file, LuaDocTagClass::class.java)
+                                if (child?.type !=null)
+                                {
+                                    substitutedTy = child.type
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    val language = Language.findLanguageByID("Lua")
+                    val text = "local " + this.varName + " = " + (substitutedTy as TyTable).psi.text + "\nreturn " + returnExpr
+                    var psiFile = PsiFileFactory.getInstance(context.project).createFileFromText("Dummy.lua", language!!, text)
+                    if (psiFile.children.isNotEmpty() && psiFile.lastChild is LuaReturnStat) {
+                        val ret = psiFile.lastChild as LuaReturnStat
+                        var child = ret.exprList?.firstChild
+                        if (child is LuaPsiTypeGuessable)
+                        {
+                            val infer = infer(context, child)
+                            if (infer != null)
+                            {
+                                return infer
+                            }
+                        }
+                    }
+                }
+            }
+
             return substitutedTy
         }
 

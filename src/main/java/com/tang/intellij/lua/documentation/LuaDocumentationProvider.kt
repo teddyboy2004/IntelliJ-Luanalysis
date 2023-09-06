@@ -308,7 +308,9 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                 }
                 parentType = null
             }
-
+        }else if(parentType is TySubstitutedDocTable)
+        {
+            parentType = null
         }
         if (parentType != null) {
             Ty.eachResolved(context, parentType) {

@@ -16,6 +16,8 @@
 
 package com.tang.intellij.lua.ty
 
+import com.intellij.lang.Language
+import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.util.PsiTreeUtil
 import com.tang.intellij.lua.Constants
 import com.tang.intellij.lua.comment.psi.LuaDocTagField
@@ -52,7 +54,15 @@ private fun inferReturnTyInner(context: SearchContext, owner: LuaFuncBodyOwner<*
     val returnTag = owner.tagReturn
 
     if (returnTag != null) {
-        return returnTag.type
+        val type = returnTag.type
+        // 处理一些特殊返回类型逻辑
+        var text = returnTag.commentString?.text
+        if (type is TyGenericParameter && text!= null && text.indexOf("$")!=-1)
+        {
+            text = text.substring(text.indexOf("$")+1)
+            type.returnExpr = text
+        }
+        return type
     }
 
     //infer from return stat

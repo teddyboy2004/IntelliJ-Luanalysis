@@ -42,12 +42,21 @@ private val MaxSingleLineUnionMembers = 5;
 private val MaxSingleLineGenericParams = 5;
 
 private fun joinSingleLineOrWrap(list: Collection<String>, maxOnLine: Int, divider: String, prefix: String = "", suffix: String = "", spaceWrapItems: Boolean = prefix.isNotEmpty()): String {
-    return if (list.size == 0) {
+    return if (list.isEmpty()) {
         prefix + suffix
-    } else if (list.size <= maxOnLine && false) { // 都垂直显示
-        list.joinToString(divider + " ", if (spaceWrapItems) prefix + " " else prefix, if (spaceWrapItems) " " + suffix else suffix)
     } else {
-        list.joinToString(divider + "\n  ", prefix + "\n  ", "\n" + suffix)
+        var containComment = false
+        for (s in list) {
+            if (s.contains("--")) {
+                containComment = true
+                break
+            }
+        }
+        if (list.size <= maxOnLine && !containComment) {
+            list.joinToString(divider + " ", if (spaceWrapItems) prefix + " " else prefix, if (spaceWrapItems) " " + suffix else suffix)
+        } else {
+            list.joinToString(divider + "\n  ", prefix + "\n  ", "\n" + suffix)
+        }
     }
 }
 
