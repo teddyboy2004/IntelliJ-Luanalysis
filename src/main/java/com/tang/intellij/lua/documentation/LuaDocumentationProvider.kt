@@ -25,6 +25,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.suggested.startOffset
+import com.tang.intellij.lua.Constants
 import com.tang.intellij.lua.comment.psi.LuaDocTagAlias
 import com.tang.intellij.lua.comment.psi.LuaDocTagClass
 import com.tang.intellij.lua.comment.psi.LuaDocTagField
@@ -308,10 +309,11 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                 }
                 parentType = null
             }
-        }else if(parentType is TySubstitutedDocTable)
+        }else if(parentType is TySubstitutedDocTable || (parentType is TyClass && parentType.displayName == Constants.WORD_G))
         {
             parentType = null
         }
+
         if (parentType != null) {
             Ty.eachResolved(context, parentType) {
                 memberRendered = renderClassMember(context, sb, it, classMember) || memberRendered

@@ -33,6 +33,7 @@ import com.tang.intellij.lua.search.PsiSearchContext
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.search.withSearchGuard
 import com.tang.intellij.lua.stubs.index.LuaClassIndex
+import org.luaj.vm2.ast.Stat.Assign
 
 
 fun inferExpr(context: SearchContext, expression: LuaExpression<*>): ITy? {
@@ -586,6 +587,16 @@ private fun guessFieldType(context: SearchContext, indexExpr: LuaIndexExpr, ty: 
 
     // _G.var = {}  <==>  var = {}
     if ((ty as? TyClass)?.className == Constants.WORD_G) {
+        // 优化类型判断，避免xxx不能跳转_G.xxx 
+        var parent = indexExpr.parent
+        if (parent is LuaVarList && parent.parent is LuaAssignStat)
+        {
+            val guessType = (parent.parent as LuaAssignStat).valueExprList?.guessType(context)
+            if(guessType != null)
+            {
+                return guessType
+            }
+        }
         return fieldName?.let { TyClass.createGlobalType(it) }
     }
 

@@ -273,9 +273,10 @@ abstract class TyClass(override val className: String,
         }
 
         for (tableField in tableFields) {
-            var indexTy = tableField.guessIndexType(context)
+            // 修复去重错误
+            var indexTy = tableField.name
             for (luaIndexExpr in luaIndexExprs) {
-                if (luaIndexExpr.guessIndexType(context) == indexTy)
+                if (luaIndexExpr.name == indexTy)
                 {
                     members.remove(luaIndexExpr)
                     luaIndexExprs.remove(luaIndexExpr)

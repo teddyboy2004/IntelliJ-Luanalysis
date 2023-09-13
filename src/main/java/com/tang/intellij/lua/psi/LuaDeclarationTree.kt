@@ -21,6 +21,8 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiNamedElement
 import com.intellij.util.BitUtil
+import com.tang.intellij.lua.Constants
+import java.io.FilenameFilter
 import java.util.*
 
 interface LuaDeclarationTree {
@@ -340,10 +342,17 @@ private abstract class LuaDeclarationTreeBase(val file: PsiFile) : LuaRecursiveV
                 curScope?.add(createDeclaration(expr.name, expr, flags))
             } else if (expr is LuaIndexExpr) {
                 val fieldName = expr.name ?: (expr.idExpr as? LuaLiteralExpr)?.let { "[${it.text}]" }
-
                 if (fieldName != null) {
-                    val declaration = curScope?.find(expr.prefixExpression)
-                    declaration?.addField(createDeclaration(fieldName, expr, DeclarationFlag.ClassMember))
+                    // 优化声明增加_G.xxx处理
+                    if(expr.nameExpr?.name == Constants.WORD_G)
+                    {
+                        curScope?.add(createDeclaration(fieldName, expr, DeclarationFlag.Global))
+                    }
+                    else
+                    {
+                        val declaration = curScope?.find(expr.prefixExpression)
+                        declaration?.addField(createDeclaration(fieldName, expr, DeclarationFlag.ClassMember))
+                    }
                 }
             }
         }

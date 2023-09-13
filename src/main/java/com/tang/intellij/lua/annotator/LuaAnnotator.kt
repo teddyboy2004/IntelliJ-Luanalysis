@@ -23,12 +23,16 @@ import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
+import com.intellij.psi.util.PsiTreeUtil
 import com.tang.intellij.lua.Constants
 import com.tang.intellij.lua.codeInsight.intention.MakeParameterOptionalIntention
 import com.tang.intellij.lua.comment.psi.*
 import com.tang.intellij.lua.highlighting.LuaHighlightingData
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.ty.TyClass
+import com.tang.intellij.lua.ty.TyFunction
+import com.tang.intellij.lua.ty.TyTable
 
 /**
  * LuaAnnotator
@@ -230,10 +234,31 @@ class LuaAnnotator : Annotator {
             super.visitIndexExpr(o)
             val prefix = o.prefixExpression
             if (prefix is LuaNameExpr && prefix.getUserData(STD_MARKER) != null) {
-                createInfoAnnotation(o, "Std apis")
+                // _G.xxx增加判断函数或者变量
+                if (o.parent is LuaVarList && o.parent.parent is LuaAssignStat)
+                {
+                    val luaAssignStat = o.parent.parent  as LuaAssignStat
+                    val guessType = luaAssignStat.valueExprList?.guessType(SearchContext.get(o.project))
+                    if (guessType is TyFunction) {
+                        createInfoAnnotation(o, "Std apis")
+                            .textAttributes(LuaHighlightingData.STD_API)
+                            .create()
+                        o.putUserData(STD_MARKER, true)
+                    }
+                    else if (o.id != null && guessType is TyClass)
+                    {
+                        createInfoAnnotation(o.id!!, "Global variable \"${o.name}\"")
+                            .textAttributes(LuaHighlightingData.GLOBAL_VAR)
+                            .create()
+                    }
+                }
+                else
+                {
+                    createInfoAnnotation(o, "Std apis")
                         .textAttributes(LuaHighlightingData.STD_API)
                         .create()
-                o.putUserData(STD_MARKER, true)
+                    o.putUserData(STD_MARKER, true)
+                }
             } else {
                 val id = o.id
                 if (id != null) {
@@ -247,8 +272,8 @@ class LuaAnnotator : Annotator {
                     } else {
                         if (o.colon != null) {
                             myHolder!!.newAnnotation(HighlightSeverity.ERROR, "Arguments expected")
-                                    .range(o)
-                                    .create()
+                                .range(o)
+                                .create()
                         } else {
                             builder.textAttributes(LuaHighlightingData.FIELD)
                         }
