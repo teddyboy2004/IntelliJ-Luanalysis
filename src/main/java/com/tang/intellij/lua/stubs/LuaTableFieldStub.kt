@@ -139,9 +139,17 @@ class LuaTableFieldType : LuaStubElementType<LuaTableFieldStub, LuaTableField>("
             }
             if((parentStub.stubType == LuaElementTypes.EXPR_LIST))
             {
-                if(parentStub.parentStub.childrenStubs[0].stubType == LuaElementType.CLASS_DEF) {
-                    className = (parentStub.parentStub.childrenStubs[0] as LuaDocTagClassStub).className
+                val stubElement = parentStub.parentStub.childrenStubs[0]
+                if(stubElement.stubType == LuaElementType.CLASS_DEF) {
+                    className = (stubElement as LuaDocTagClassStub).className
                 }
+//                else if(stubElement.stubType == LuaTypes.VAR_LIST && stubElement.childrenStubs[0].stubType == LuaTypes.NAME_EXPR)
+//                {
+//                    val child = stubElement.childrenStubs[0] as LuaNameExprStub
+//                    if (child.isGlobal) {
+//                        className = child.module + "." + child.name
+//                    }
+//                }
                 break
             }
             parentStub = parentStub.parentStub

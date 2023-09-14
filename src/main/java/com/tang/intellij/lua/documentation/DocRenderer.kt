@@ -17,6 +17,7 @@
 package com.tang.intellij.lua.documentation
 
 import com.intellij.codeInsight.documentation.DocumentationManagerUtil
+import com.intellij.openapi.editor.impl.EditorCssFontResolver
 import com.intellij.psi.PsiElement
 import com.tang.intellij.lua.comment.psi.*
 import com.tang.intellij.lua.comment.psi.api.LuaComment
@@ -199,7 +200,8 @@ private fun renderFieldDef(sb: StringBuilder, tagField: LuaDocTagField, tyRender
 }
 
 fun renderDefinition(sb: StringBuilder, block: () -> Unit) {
-    sb.append("<div class='definition'><pre>")
+    // 优化提示中的中文字体显示
+    sb.append("<div class='definition'><pre style=\"font-family:'Microsoft YaHei'\">")
     block()
     sb.append("</pre></div>")
 }

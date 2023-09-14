@@ -45,14 +45,21 @@ private fun joinSingleLineOrWrap(list: Collection<String>, maxOnLine: Int, divid
     return if (list.isEmpty()) {
         prefix + suffix
     } else {
-        var containComment = false
+        var wrapLine = false
         for (s in list) {
-            if (s.contains("--")) {
-                containComment = true
+            // 过长也换行显示
+            if(s.length > 40)
+            {
+                wrapLine = true
+                break;
+            }
+            // 有注释换行显示
+            else if (s.contains("--")) {
+                wrapLine = true
                 break
             }
         }
-        if (list.size <= maxOnLine && !containComment) {
+        if (list.size <= maxOnLine && !wrapLine) {
             list.joinToString(divider + " ", if (spaceWrapItems) prefix + " " else prefix, if (spaceWrapItems) " " + suffix else suffix)
         } else {
             list.joinToString(divider + "\n  ", prefix + "\n  ", "\n" + suffix)

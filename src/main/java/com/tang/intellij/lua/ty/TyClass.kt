@@ -647,6 +647,18 @@ fun getTableTypeName(table: LuaTableExpr): String {
         return stub.tableTypeName
 
     val id = table.containingFile.getFileIdentifier()
+    // 优化全局搜索
+    if((table.parent is LuaExprList && table.parent.parent is LuaAssignStat))
+    {
+        val assign = table.parent.parent as LuaAssignStat
+        if (assign.varExprList.firstChild is LuaNameExpr) {
+            val child = assign.varExprList.firstChild as LuaNameExpr
+            if (child.isGlobal()) {
+                return Constants.WORD_G + "." + child.name
+            }
+        }
+    }
+
     return "table@$id:${table.node.startOffset}"
 }
 
