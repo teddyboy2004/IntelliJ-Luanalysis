@@ -19,14 +19,13 @@ package com.tang.intellij.lua.psi
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
+import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiTreeUtil
 import com.tang.intellij.lua.Constants
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.stubs.index.LuaClassIndex
 import com.tang.intellij.lua.stubs.index.LuaClassMemberIndex
-import com.tang.intellij.lua.ty.ITyClass
-import com.tang.intellij.lua.ty.ITyGeneric
-import com.tang.intellij.lua.ty.TyUnion
+import com.tang.intellij.lua.ty.*
 
 fun resolveLocal(context: SearchContext?, ref: LuaNameExpr) = resolveLocal(context, ref.name, ref)
 
@@ -169,8 +168,24 @@ fun resolve(context: SearchContext, indexExpr: LuaIndexExpr): PsiElement? {
     return memberPsi
 }
 
+fun findSuperClassType(type: ITy?, memberName:String, project: Project, scope: GlobalSearchScope, set:HashSet<String>):ITy?
+{
+    if (type !is TyClass || !set.add(type.className)) return null
+    val classType = findSuperClassType(type.superClass, memberName,project, scope, set)
+    if (classType != null)
+    {
+        return classType
+    }
+    val get = LuaClassMemberIndex.instance.get("${type.className}*${memberName}", project, scope)
+    if (get.isNotEmpty())
+    {
+        return type
+    }
+    return null
+}
+
 fun resolve(context: SearchContext, indexExpr: LuaIndexExpr, memberName: String): PsiElement? {
-    val type = indexExpr.guessParentType(context)
+    var type = indexExpr.guessParentType(context)
     var ret: PsiElement? = null
 
     // 23-07-03 11:04 teddysjwu: 增加__super跳转
@@ -191,10 +206,20 @@ fun resolve(context: SearchContext, indexExpr: LuaIndexExpr, memberName: String)
         }
     }
 
+    // 优先跳转父类
+    if (type is TyClass)
+    {
+        var iTy = findSuperClassType(type, memberName, indexExpr.project, GlobalSearchScope.projectScope(indexExpr.project), HashSet())
+        if (iTy!= null)
+        {
+            type = iTy
+        }
+    }
+
     type.eachTopClass { ty ->
         val cls = (if (ty is ITyGeneric) ty.base else ty) as? ITyClass
         ret = cls?.findMember(context, memberName)?.psi
-        ret == null
+        false
     }
 
     if (ret == null) {
