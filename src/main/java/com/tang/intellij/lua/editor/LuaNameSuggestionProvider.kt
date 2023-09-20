@@ -36,11 +36,14 @@ import com.tang.intellij.lua.ty.*
  */
 class LuaNameSuggestionProvider : NameSuggestionProvider {
 
+    var keywords: HashSet<String>? = null
+
     companion object {
         fun fixName(oriName: String): String {
             return oriName.replace(".", "")
         }
     }
+
 
     private fun collectNames(context: SearchContext, type: ITy, collector: (name: String, suffix: String, preferLonger: Boolean) -> Unit) {
         when (type) {
@@ -114,6 +117,9 @@ class LuaNameSuggestionProvider : NameSuggestionProvider {
         search.forEach { getNames(it, set) }
 
         if (psi is LuaPsiTypeGuessable) {
+            if (keywords == null) {
+                keywords  = initKeywords()
+            }
             val context = SearchContext.get(psi.getProject())
             val type = psi.guessType(context)
             if (type != null) {
@@ -152,7 +158,7 @@ class LuaNameSuggestionProvider : NameSuggestionProvider {
                     val wordsScanner = LanguageFindUsages.INSTANCE.forLanguage(LuaLanguage.INSTANCE).wordsScanner
                     wordsScanner?.processWords(psi.containingFile.text) {
                         val word = it.baseText.subSequence(it.start, it.end).toString()
-                        if (word.length > 2 && LuaRefactoringUtil.isLuaIdentifier(word)) {
+                        if (word.length > 2 && LuaRefactoringUtil.isLuaIdentifier(word) && !keywords!!.contains(word)) {
                             set.add(word)
                         }
                         true
@@ -161,5 +167,18 @@ class LuaNameSuggestionProvider : NameSuggestionProvider {
             }
         }
         return null
+    }
+
+    private fun initKeywords(): HashSet<String> {
+        val set = HashSet<String>()
+        LuaTypes::class.java.fields.forEach {
+            field ->
+            val data = field.get(null)
+            if (data is LuaTokenType && LuaRefactoringUtil.isLuaIdentifier(data.debugName))
+            {
+                set.add(data.debugName)
+            }
+        }
+        return set
     }
 }

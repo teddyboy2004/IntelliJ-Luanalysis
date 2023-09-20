@@ -16,11 +16,17 @@
 
 package com.tang.intellij.lua.reference
 
+import com.intellij.openapi.util.TextRange
 import com.intellij.patterns.PlatformPatterns.psiElement
 import com.intellij.psi.*
+import com.intellij.util.IncorrectOperationException
 import com.intellij.util.ProcessingContext
+import com.intellij.util.applyIf
 import com.tang.intellij.lua.project.LuaSettings
 import com.tang.intellij.lua.psi.*
+import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.ty.returnStatement
+import org.jaxen.expr.LiteralExpr
 
 /**
  * reference contributor
@@ -32,6 +38,58 @@ class LuaReferenceContributor : PsiReferenceContributor() {
         psiReferenceRegistrar.registerReferenceProvider(psiElement().withElementType(LuaTypes.INDEX_EXPR), IndexExprReferenceProvider())
         psiReferenceRegistrar.registerReferenceProvider(psiElement().withElementType(LuaTypes.NAME_EXPR), NameReferenceProvider())
         psiReferenceRegistrar.registerReferenceProvider(psiElement().withElementType(LuaTypes.GOTO_STAT), GotoReferenceProvider())
+        psiReferenceRegistrar.registerReferenceProvider(psiElement().withElementType(LuaTypes.LITERAL_EXPR), LuaFileStringReferenceProvider())
+    }
+
+    internal inner class LuaFileStringReferenceProvider : PsiReferenceProvider() {
+
+        inner class LuaFileStringReference(val expr: LuaLiteralExpr)
+            : PsiReferenceBase<LuaLiteralExpr>(expr) {
+
+            val id = expr.psi
+
+            override fun getVariants(): Array<Any> = arrayOf()
+
+            @Throws(IncorrectOperationException::class)
+            override fun handleElementRename(newElementName: String): PsiElement {
+                return expr
+            }
+
+            override fun getRangeInElement(): TextRange {
+                val start = id.node.startOffset - myElement.node.startOffset
+                return TextRange(start, start + id.textLength)
+            }
+
+            override fun isReferenceTo(element: PsiElement): Boolean {
+                return false
+            }
+
+            override fun resolve(): PsiElement? {
+                val filePsi = resolveRequireFile(id.text.replace("\"",""), id.project)
+                if (filePsi != null) {
+                    val returnStatement = filePsi.returnStatement()
+
+                    if (returnStatement != null && returnStatement.exprList?.expressionList?.size == 1) {
+                        val resolvedNameExpr = returnStatement.exprList!!.expressionList.first() as? LuaNameExpr
+
+                        return if (resolvedNameExpr != null) {
+                            resolveInFile(SearchContext.get(myElement.project), resolvedNameExpr.name, resolvedNameExpr)
+                        } else returnStatement
+                    }
+                    if (returnStatement != null) {
+                        return returnStatement
+                    }
+                }
+                return filePsi
+            }
+        }
+
+        override fun getReferencesByElement(psiElement: PsiElement, processingContext: ProcessingContext): Array<PsiReference> {
+            if (psiElement is LuaLiteralExpr && psiElement.text != null && LuaFileUtil.findFile(psiElement.project, psiElement.text.replace("\"",""))!=null) {
+                return arrayOf(LuaFileStringReference(psiElement))
+            }
+            return PsiReference.EMPTY_ARRAY
+        }
     }
 
     internal inner class GotoReferenceProvider : PsiReferenceProvider() {

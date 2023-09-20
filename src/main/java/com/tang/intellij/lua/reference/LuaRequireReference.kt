@@ -79,8 +79,9 @@ class LuaRequireReference internal constructor(callExpr: LuaCallExpr) : PsiRefer
                     resolveInFile(SearchContext.get(myElement.project), resolvedNameExpr.name, resolvedNameExpr)
                 } else returnStatement
             }
-
-            return returnStatement
+            // 没有返回值也可以跳转到文件
+            if (returnStatement!=null)
+                return returnStatement
         }
 
         return filePsi

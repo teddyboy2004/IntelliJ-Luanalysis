@@ -18,6 +18,8 @@ package com.tang.intellij.lua.editor
 
 import com.intellij.lang.refactoring.RefactoringSupportProvider
 import com.intellij.psi.PsiElement
+import com.intellij.refactoring.RefactoringActionHandler
+import com.tang.intellij.lua.refactoring.rename.LuaIntroduceVarHandler
 
 /**
  *
@@ -26,5 +28,14 @@ import com.intellij.psi.PsiElement
 class LuaRefactoringSupportProvider : RefactoringSupportProvider() {
     override fun isMemberInplaceRenameAvailable(element: PsiElement, context: PsiElement?): Boolean {
         return true
+    }
+
+
+    override fun getIntroduceVariableHandler(): RefactoringActionHandler? {
+        return LuaIntroduceVarHandler()
+    }
+
+    override fun getIntroduceVariableHandler(element: PsiElement?): RefactoringActionHandler? {
+        return LuaIntroduceVarHandler()
     }
 }

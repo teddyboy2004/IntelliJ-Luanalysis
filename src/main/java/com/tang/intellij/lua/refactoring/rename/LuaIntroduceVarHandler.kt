@@ -17,6 +17,7 @@
 package com.tang.intellij.lua.refactoring.rename
 
 import com.intellij.codeInsight.CodeInsightUtilCore
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
@@ -53,7 +54,22 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
     }
 
     override fun invoke(project: Project, editor: Editor, psiFile: PsiFile, dataContext: DataContext) {
-
+        var caret = dataContext.getData(CommonDataKeys.CARET)
+        var offset = caret?.offset
+        if (offset == null)
+        {
+            return
+        }
+        var data = psiFile.findElementAt(offset)
+        if (data !is LuaExpression<*>)
+        {
+            data = PsiTreeUtil.getParentOfType(data, LuaExpression::class.java)
+        }
+        if (data == null)
+        {
+            return
+        }
+        invoke(project, editor, data as LuaExpression<*>)
     }
 
     override fun invoke(project: Project, psiElements: Array<PsiElement>, dataContext: DataContext) {
@@ -116,9 +132,19 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
                 operation.position = localDefStat
             } else {
                 val anchor = findAnchor(operation.occurrences)
-                commonParent = anchor?.parent
-                localDefStat = commonParent!!.addBefore(localDefStat, anchor)
-                commonParent.addAfter(LuaElementFactory.newLine(operation.project), localDefStat)
+
+                if (anchor == operation.occurrences.first().parent && anchor is LuaExprStat)
+                {
+                    localDefStat = element.replace(localDefStat)
+                    operation.position = localDefStat
+                }
+                else
+                {
+                    commonParent = anchor?.parent
+                    localDefStat = commonParent!!.addBefore(localDefStat, anchor)
+                    commonParent.addAfter(LuaElementFactory.newLine(operation.project), localDefStat)
+                }
+
                 operation.occurrences.forEach { occ->
                     var identifier = LuaElementFactory.createName(operation.project, operation.name)
                     identifier = occ.replace(identifier)
