@@ -18,10 +18,16 @@ package com.tang.intellij.lua.editor.structure
 
 import com.intellij.ide.structureView.StructureViewTreeElement
 import com.intellij.ide.util.treeView.smartTree.TreeElement
+import com.intellij.navigation.ColoredItemPresentation
 import com.intellij.navigation.ItemPresentation
 import com.intellij.navigation.NavigationItem
+import com.intellij.openapi.editor.colors.CodeInsightColors
+import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.tang.intellij.lua.psi.LuaPsiElement
 import com.tang.intellij.lua.psi.LuaTableField
+import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.ty.TypeMember
+import com.tang.intellij.lua.ty.guessParentClass
 import javax.swing.Icon
 
 /**
@@ -41,7 +47,7 @@ open class LuaTreeElement(val element: NavigationItem, var name: String, val ico
     }
 
     override fun getPresentation(): ItemPresentation {
-        return object : ItemPresentation {
+        return object : ColoredItemPresentation {
             override fun getPresentableText(): String? {
                 return this@LuaTreeElement.getPresentableText()
             }
@@ -49,7 +55,11 @@ open class LuaTreeElement(val element: NavigationItem, var name: String, val ico
             override fun getLocationString(): String? {
                 if (this@LuaTreeElement.inherited) {
                     val item = this@LuaTreeElement.element
-                    if (item is LuaPsiElement) {
+                    if (item is TypeMember)
+                    {
+                        return item.guessParentClass(SearchContext.get(item.psi.project))?.className
+                    }
+                    else if (item is LuaPsiElement) {
                         return item.containingFile.name
                     }
                 }
@@ -58,6 +68,14 @@ open class LuaTreeElement(val element: NavigationItem, var name: String, val ico
 
             override fun getIcon(b: Boolean): Icon? {
                 return this@LuaTreeElement.icon
+            }
+
+            override fun getTextAttributesKey(): TextAttributesKey? {
+                if (this@LuaTreeElement.inherited)
+                {
+                    return CodeInsightColors.NOT_USED_ELEMENT_ATTRIBUTES
+                }
+                return null
             }
         }
     }

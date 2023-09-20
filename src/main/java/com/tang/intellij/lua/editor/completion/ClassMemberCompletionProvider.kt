@@ -114,58 +114,111 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
                            completionResultSet: CompletionResultSet,
                            prefixMatcher: PrefixMatcher,
                            handlerProcessor: HandlerProcessor?) {
-        val globalChildTys = unionTy.getChildTypes().filter { it.isGlobal }
-        val nonGlobalChildTys = unionTy.getChildTypes().filter { !it.isGlobal }
-
-        globalChildTys.forEach {
-            addClass(context, contextTy, it, completionMode, completionResultSet, prefixMatcher, handlerProcessor)
-        }
-
-        if (nonGlobalChildTys.isEmpty()) {
-            return
-        }
-
-        val firstChildTy = nonGlobalChildTys.first()
-        val subsequentChildTys = nonGlobalChildTys.drop(1)
-        val memberSubstitutor = firstChildTy.getMemberSubstitutor(context)
-
-        firstChildTy.processMembers(context) { curType, member ->
-            val curClass = (if (curType is ITyGeneric) curType.base else curType) as? ITyClass
-
-            if (curClass != null) {
-                member.name?.let { memberName ->
-                    if (prefixMatcher.prefixMatches(memberName) && curClass.isVisibleInScope(context.project, contextTy, member.visibility)) {
-                        var memberTy = member.guessType(context) ?: Primitives.UNKNOWN
-
-                        subsequentChildTys.forEach { childTy ->
-                            if (!childTy.isGlobal) {
-                                val ty = childTy.guessMemberType(context, memberName)
-
-                                if (ty == null) {
-                                    return@processMembers true
+        var childTypes = unionTy.getChildTypes()
+        var memberNameTypes = HashMap<String,ITy>()
+        var typeMembers = HashMap<String,TypeMember>()
+        childTypes.forEach{
+            iTy ->
+            if (iTy is TyClass)
+            {
+                iTy.processMembers(context){
+                        curType, member ->
+                        val curClass = (if (curType is ITyGeneric) curType.base else curType) as? ITyClass
+                        if (curClass!=null)
+                        {
+                            member.name?.let { memberName ->
+                                if (prefixMatcher.prefixMatches(memberName) && curClass.isVisibleInScope(context.project, contextTy, member.visibility)) {
+                                    var memberTy = member.guessType(context) ?: Primitives.UNKNOWN
+                                    var t = memberNameTypes[memberName]
+                                    if (t == null)
+                                    {
+                                        t = memberTy
+                                        typeMembers[memberName] = member
+                                    }
+                                    else
+                                    {
+                                        t = t.union(context, memberTy)
+                                    }
+                                    memberNameTypes[memberName] = t
                                 }
-
-                                memberTy = memberTy.union(context, ty)
                             }
                         }
+                        true
 
-                        addMember(
-                            context,
-                            completionResultSet,
-                            member,
-                            memberSubstitutor,
-                            prefixTy,
-                            memberName,
-                            memberTy,
-                            completionMode,
-                            handlerProcessor
-                        )
-                    }
                 }
             }
+            true
+        }
+
+        memberNameTypes.forEach(){
+            name, type ->
+            addMember(
+                context,
+                completionResultSet,
+                typeMembers[name]!!,
+                type.getMemberSubstitutor(context),
+                prefixTy,
+                name,
+                type,
+                completionMode,
+                handlerProcessor
+            )
 
             true
         }
+
+//        val globalChildTys = unionTy.getChildTypes().filter { it.isGlobal }
+//        val nonGlobalChildTys = unionTy.getChildTypes().filter { !it.isGlobal }
+//
+//        globalChildTys.forEach {
+//            addClass(context, contextTy, it, completionMode, completionResultSet, prefixMatcher, handlerProcessor)
+//        }
+//
+//        if (nonGlobalChildTys.isEmpty()) {
+//            return
+//        }
+//
+//        val firstChildTy = nonGlobalChildTys.first()
+//        val subsequentChildTys = nonGlobalChildTys.drop(1)
+//        val memberSubstitutor = firstChildTy.getMemberSubstitutor(context)
+//
+//        firstChildTy.processMembers(context) { curType, member ->
+//            val curClass = (if (curType is ITyGeneric) curType.base else curType) as? ITyClass
+//
+//            if (curClass != null) {
+//                member.name?.let { memberName ->
+//                    if (prefixMatcher.prefixMatches(memberName) && curClass.isVisibleInScope(context.project, contextTy, member.visibility)) {
+//                        var memberTy = member.guessType(context) ?: Primitives.UNKNOWN
+//
+//                        subsequentChildTys.forEach { childTy ->
+//                            if (!childTy.isGlobal) {
+//                                val ty = childTy.guessMemberType(context, memberName)
+//
+//                                if (ty == null) {
+//                                    return@processMembers true
+//                                }
+//
+//                                memberTy = memberTy.union(context, ty)
+//                            }
+//                        }
+//
+//                        addMember(
+//                            context,
+//                            completionResultSet,
+//                            member,
+//                            memberSubstitutor,
+//                            prefixTy,
+//                            memberName,
+//                            memberTy,
+//                            completionMode,
+//                            handlerProcessor
+//                        )
+//                    }
+//                }
+//            }
+//
+//            true
+//        }
     }
 
     protected fun addClass(context: SearchContext,

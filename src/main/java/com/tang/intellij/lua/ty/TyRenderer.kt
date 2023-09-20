@@ -41,6 +41,8 @@ private val MaxSingleLineTableMembers = 3;
 private val MaxSingleLineUnionMembers = 5;
 private val MaxSingleLineGenericParams = 5;
 
+private val regex = Regex("<.*?>")
+
 private fun joinSingleLineOrWrap(list: Collection<String>, maxOnLine: Int, divider: String, prefix: String = "", suffix: String = "", spaceWrapItems: Boolean = prefix.isNotEmpty()): String {
     return if (list.isEmpty()) {
         prefix + suffix
@@ -48,13 +50,14 @@ private fun joinSingleLineOrWrap(list: Collection<String>, maxOnLine: Int, divid
         var wrapLine = false
         for (s in list) {
             // 过长也换行显示
-            if(s.length > 40)
+            val replace = s.replace(regex, "")
+            if(replace.length > 40)
             {
                 wrapLine = true
                 break;
             }
             // 有注释换行显示
-            else if (s.contains("--")) {
+            else if (replace.contains("--")) {
                 wrapLine = true
                 break
             }

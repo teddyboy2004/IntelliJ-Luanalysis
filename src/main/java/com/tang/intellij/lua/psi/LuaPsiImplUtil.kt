@@ -94,26 +94,22 @@ fun isStatic(classMethodDefStat: LuaClassMethodDefStat): Boolean {
 fun getPresentation(classMethodDefStat: LuaClassMethodDefStat): ItemPresentation {
     return object : ItemPresentation {
         override fun getPresentableText(): String? {
-            // 避免跳转项目符号显示结构
-            val type = classMethodDefStat.guessParentClass(SearchContext.get(classMethodDefStat.project))
-            if (type != null) {
-                val c = if (classMethodDefStat.isStatic) "." else ":"
-                var nameExpr = PsiTreeUtil.findChildOfType(classMethodDefStat, LuaNameExpr::class.java)
-                var typeName = ""
-                if(nameExpr!= null)
-                {
-                    typeName = nameExpr.name
-                }
-                else
-                {
-                    typeName = type.displayName
-                }
-                return typeName + c + classMethodDefStat.name + classMethodDefStat.paramSignature
-            }
-            return classMethodDefStat.name!! + classMethodDefStat.paramSignature
+            return classMethodDefStat.name!!+classMethodDefStat.paramSignature
         }
 
         override fun getLocationString(): String {
+            // 避免跳转项目符号显示结构
+            val type = classMethodDefStat.guessParentClass(SearchContext.get(classMethodDefStat.project))
+            if (type != null) {
+                val nameExpr = PsiTreeUtil.findChildOfType(classMethodDefStat, LuaNameExpr::class.java)
+                var typeName = ""
+                typeName = if(nameExpr!= null) {
+                    nameExpr.name
+                } else {
+                    type.displayName
+                }
+                return typeName
+            }
             return classMethodDefStat.containingFile.name
         }
 

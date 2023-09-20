@@ -104,57 +104,6 @@ class TyGenericParameter(name: String, val scopeName: String?, override val varN
         var substitutedTy = super.substitute(context, substitutor)
 
         if (substitutedTy !== this) {
-            // 特殊处理$返回
-            if (returnExpr != "" && substitutedTy is TyTable)
-            {
-                if(returnExpr.indexOf("requireField:")!=-1)
-                {
-                    val fileName = returnExpr.replace("requireField:", "").trim()
-                    val member = substitutedTy.findMember(context, fileName)
-                    val guessType = member?.guessType(context)
-                    if (guessType is TyPrimitiveLiteral)
-                    {
-                        val value = guessType.value
-                        val find = LuaClassIndex.find(context, value.replace(Regex(".*[\\.\\\\]"),""))
-                        if (find != null)
-                        {
-                            substitutedTy = find.type
-                        }
-                        else
-                        {
-                            val file = resolveRequireFile(value, context.project)
-
-                            if (file != null)
-                            {
-                                var child = PsiTreeUtil.findChildOfType(file, LuaDocTagClass::class.java)
-                                if (child?.type !=null)
-                                {
-                                    substitutedTy = child.type
-                                }
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    val language = Language.findLanguageByID("Lua")
-                    val text = "local " + this.varName + " = " + (substitutedTy as TyTable).psi.text + "\nreturn " + returnExpr
-                    var psiFile = PsiFileFactory.getInstance(context.project).createFileFromText("Dummy.lua", language!!, text)
-                    if (psiFile.children.isNotEmpty() && psiFile.lastChild is LuaReturnStat) {
-                        val ret = psiFile.lastChild as LuaReturnStat
-                        var child = ret.exprList?.firstChild
-                        if (child is LuaPsiTypeGuessable)
-                        {
-                            val infer = infer(context, child)
-                            if (infer != null)
-                            {
-                                return infer
-                            }
-                        }
-                    }
-                }
-            }
-
             return substitutedTy
         }
 

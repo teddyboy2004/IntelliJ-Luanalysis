@@ -19,11 +19,14 @@ package com.tang.intellij.lua.ty
 import com.intellij.psi.PsiElement
 import com.intellij.psi.stubs.StubInputStream
 import com.intellij.psi.stubs.StubOutputStream
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.Processor
 import com.tang.intellij.lua.comment.psi.LuaDocFunctionTy
+import com.tang.intellij.lua.comment.psi.LuaDocTagClass
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.stubs.*
+import com.tang.intellij.lua.stubs.index.LuaClassIndex
 
 interface IFunSignature {
     val colonCall: Boolean
@@ -226,8 +229,70 @@ abstract class FunSignatureBase(override val colonCall: Boolean,
                 substitutedGenericParam
             }?.filterIsInstance<TyGenericParameter>()?.toTypedArray()
 
-        val substitutedReturnTy = returnTy?.substitute(context, substitutor)
+        var substitutedReturnTy = returnTy?.substitute(context, substitutor)
         val substitutedVarargTy = variadicParamTy?.let { TyMultipleResults.getResult(context, it.substitute(context, substitutor)) }
+
+        if (substitutedReturnTy == returnTy && returnTy is TyGenericParameter && substitutedParams!=null)
+        {
+            // 特殊处理$返回
+            val returnExpr = (returnTy as TyGenericParameter).returnExpr
+                if(returnExpr.indexOf("requireField:")!=-1)
+                {
+                    val matchEntire = Regex(".*requireField:(.*?)\\.(.*)").matchEntire(returnExpr)
+                    if (matchEntire!=null)
+                    {
+                        val paramName = matchEntire.groups[1]!!.value
+                        val fieldName = matchEntire.groups[2]!!.value
+                        val paramInfo = substitutedParams.find { luaParamInfo -> luaParamInfo.name == paramName}
+                        if (paramInfo?.ty is TyTable)
+                        {
+                            val member = paramInfo.ty.findMember(context, fieldName)
+                            val guessType = member?.guessType(context)
+                            if (guessType is TyPrimitiveLiteral)
+                            {
+                                val value = guessType.value
+                                val tagClass = LuaClassIndex.find(context, value.replace(Regex(".*[\\.\\\\]"),""))
+                                if (tagClass != null)
+                                {
+                                    substitutedReturnTy = tagClass.type
+                                }
+                                else
+                                {
+                                    val file = resolveRequireFile(value, context.project)
+
+                                    if (file != null)
+                                    {
+                                        var child = PsiTreeUtil.findChildOfType(file, LuaDocTagClass::class.java)
+                                        if (child?.type !=null)
+                                        {
+                                            substitutedReturnTy = child.type
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+//                else
+//                {
+//                    val language = Language.findLanguageByID("Lua")
+//                    val text = "local " + this.varName + " = " + (substitutedTy as TyTable).psi.text + "\nreturn " + returnExpr
+//                    var psiFile = PsiFileFactory.getInstance(context.project).createFileFromText("Dummy.lua", language!!, text)
+//                    if (psiFile.children.isNotEmpty() && psiFile.lastChild is LuaReturnStat) {
+//                        val ret = psiFile.lastChild as LuaReturnStat
+//                        var child = ret.exprList?.firstChild
+//                        if (child is LuaPsiTypeGuessable)
+//                        {
+//                            val infer = infer(context, child)
+//                            if (infer != null)
+//                            {
+//                                return infer
+//                            }
+//                        }
+//                    }
+//                }
+        }
+
 
         return if (paramsSubstituted || substitutedReturnTy !== returnTy || substitutedVarargTy !== variadicParamTy) {
             FunSignature(
