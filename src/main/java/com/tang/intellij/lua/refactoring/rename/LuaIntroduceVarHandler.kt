@@ -17,7 +17,6 @@
 package com.tang.intellij.lua.refactoring.rename
 
 import com.intellij.codeInsight.CodeInsightUtilCore
-import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
@@ -27,11 +26,16 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.elementsAroundOffsetUp
+import com.intellij.refactoring.IntroduceTargetChooser
 import com.intellij.refactoring.RefactoringActionHandler
 import com.intellij.refactoring.introduce.inplace.InplaceVariableIntroducer
 import com.intellij.refactoring.introduce.inplace.OccurrencesChooser
+import com.intellij.refactoring.suggested.endOffset
+import com.tang.intellij.lua.lang.LuaLanguage
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
+
 
 /**
  *
@@ -54,29 +58,82 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
     }
 
     override fun invoke(project: Project, editor: Editor, psiFile: PsiFile, dataContext: DataContext) {
-        var caret = dataContext.getData(CommonDataKeys.CARET)
-        var offset = caret?.offset
-        if (offset == null)
-        {
-            return
+        val selectionModel = editor.getSelectionModel();
+
+        // 有选择优先判断选择项
+        if (selectionModel.hasSelection()) {
+            val expression = findExpressionInRange(psiFile, selectionModel.selectionStart, selectionModel.selectionEnd)
+            if (expression!=null)
+            {
+                invoke(project, editor, expression)
+                return
+            }
         }
-        var data = psiFile.findElementAt(offset)
-        if (data !is LuaExpression<*>)
-        {
-            data = PsiTreeUtil.getParentOfType(data, LuaExpression::class.java)
+
+        // 没有或者不合法，显示提示项
+        var offset = editor.caretModel.offset;
+        if (offset >= psiFile.endOffset) {
+            offset = psiFile.endOffset - 1
         }
-        if (data == null)
-        {
-            return
+        val expressions: ArrayList<LuaExpression<*>> = ArrayList();
+        if (psiFile is LuaPsiFile) {
+            val iterator = psiFile.elementsAroundOffsetUp(offset)
+            while (iterator.hasNext()) {
+                val next = iterator.next().first
+                if (next is LuaFuncBodyOwner<*>)
+                {
+                    break
+                }
+                if (next is LuaExpression<*>) {
+                    expressions.add(next)
+                }
+            }
         }
-        invoke(project, editor, data as LuaExpression<*>)
+
+        val size = expressions.size
+        when (size) {
+            0 -> {
+                return
+            }
+            1 -> {
+                invoke(project, editor, expressions[0])
+            }
+            else -> {
+                IntroduceTargetChooser.showChooser(
+                    editor, expressions,
+                    object : Pass<Any?>() {
+                        override fun pass(t: Any?) {
+                            if (t is LuaExpression<*>) {
+                                invoke(project, editor, t)
+                            }
+                        }
+                    },
+                    { expr -> expr.text }
+                )
+            }
+        }
+
+    }
+
+    fun findExpressionInRange(file: PsiFile, startOffset: Int, endOffset: Int): LuaExpression<*>?
+    {
+        val expression = CodeInsightUtilCore.findElementInRange(file, startOffset, endOffset, LuaExpression::class.java, LuaLanguage.INSTANCE)
+        if (expression is LuaExpression)
+        {
+            return expression
+        }
+        return null
     }
 
     override fun invoke(project: Project, psiElements: Array<PsiElement>, dataContext: DataContext) {
 
     }
 
-    operator fun invoke(project: Project, editor: Editor, expression: LuaExpression<*>) {
+    operator fun invoke(project: Project, editor: Editor, expression: LuaExpression<*>?) {
+        if (expression == null)
+        {
+            return
+        }
         val occurrences = getOccurrences(expression)
         val operation = IntroduceOperation(expression, project, editor, expression.containingFile, occurrences)
         OccurrencesChooser.simpleChooser<PsiElement>(editor).showChooser(expression, occurrences, object : Pass<OccurrencesChooser.ReplaceChoice>() {
@@ -124,6 +181,7 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
         if (commonParent != null) {
             var element = operation.element
             var localDefStat: PsiElement = LuaElementFactory.createWith(operation.project, "local var = " + element.text)
+            var needSetPosition = true
             val inline = isInline(commonParent, operation)
             if (inline) {
                 if (element is LuaCallExpr && element.parent is LuaExprStat)
@@ -137,6 +195,7 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
                 {
                     localDefStat = element.replace(localDefStat)
                     operation.position = localDefStat
+                    needSetPosition = false
                 }
                 else
                 {
@@ -149,7 +208,7 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
                     var identifier = LuaElementFactory.createName(operation.project, operation.name)
                     identifier = occ.replace(identifier)
                     operation.newOccurrences.add(identifier)
-                    if (occ == operation.element)
+                    if (occ == operation.element && needSetPosition)
                         operation.position = identifier
                 }
             }
@@ -174,8 +233,13 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
             operation.project,
             "Introduce Variable",
             operation.newOccurrences.toTypedArray(),
-            operation.position
+            null // 避免因为在闭包里，导致报错
     ) {
+
+        init { // 补充闭包对应处理逻辑
+            myExpr = operation.position
+            myExprMarker = if (myExpr != null) createMarker(myExpr) else null
+        }
 
         override fun checkLocalScope(): PsiElement? {
             val currentFile = PsiDocumentManager.getInstance(this.myProject).getPsiFile(this.myEditor.document)

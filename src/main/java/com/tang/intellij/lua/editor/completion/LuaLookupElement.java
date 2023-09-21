@@ -183,5 +183,5 @@ public abstract class LuaLookupElement extends LookupElement implements Comparab
     }
 
     @Override
-    public abstract @NotNull LuaPsiElement getObject();
+    public abstract @NotNull Object getObject();
 }

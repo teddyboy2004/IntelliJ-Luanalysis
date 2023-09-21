@@ -91,8 +91,8 @@ class LuaFieldLookupElement(val fieldName: String, val field: LuaTypeField, val 
         super.renderElement(presentation)
     }
 
-    override fun getObject(): LuaPsiElement {
-        return field
+    override fun getObject(): String {
+        return field.name!! // 避免因为不合法导致无法输出
     }
 }
 
