@@ -35,6 +35,10 @@ import com.intellij.refactoring.suggested.endOffset
 import com.tang.intellij.lua.lang.LuaLanguage
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
+import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.ty.ITyFunction
+import com.tang.intellij.lua.ty.TyFunction
+import com.tang.intellij.lua.ty.TyPsiFunction
 
 
 /**
@@ -78,6 +82,7 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
         val expressions: ArrayList<LuaExpression<*>> = ArrayList();
         if (psiFile is LuaPsiFile) {
             val iterator = psiFile.elementsAroundOffsetUp(offset)
+            var context = SearchContext.get(project)
             while (iterator.hasNext()) {
                 val next = iterator.next().first
                 if (next is LuaFuncBodyOwner<*>)
@@ -85,6 +90,11 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
                     break
                 }
                 if (next is LuaExpression<*>) {
+                    // 跳过调用的函数成员变量
+                    if (next is LuaIndexExpr && next.parent is LuaCallExpr)
+                    {
+                        continue
+                    }
                     expressions.add(next)
                 }
             }

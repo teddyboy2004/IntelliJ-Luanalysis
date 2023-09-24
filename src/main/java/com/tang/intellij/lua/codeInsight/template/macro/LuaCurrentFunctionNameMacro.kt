@@ -19,12 +19,13 @@ package com.tang.intellij.lua.codeInsight.template.macro
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInsight.template.*
+import com.intellij.codeInsight.template.impl.VariableNode
 import com.intellij.psi.PsiFile
 import com.tang.intellij.lua.codeInsight.template.context.LuaFunContextType
 import com.tang.intellij.lua.psi.*
 
 class LuaCurrentFunctionNameMacro : Macro() {
-    override fun getPresentableName() = "LuaCurrentFunctionName()"
+    override fun getPresentableName() = "LuaCurrentFunctionName(short)"
 
     override fun getName() = "LuaCurrentFunctionName"
 
@@ -50,17 +51,26 @@ class LuaCurrentFunctionNameMacro : Macro() {
     }
 
     override fun calculateLookupItems(params: Array<out Expression>, context: ExpressionContext?): Array<LookupElement>? {
+        var short = true
+        if (params.isNotEmpty() && params.first() is VariableNode) {
+            val expression = params.first() as VariableNode
+            short = expression.name == "true"
+        }
         var e = context?.psiElementAtStartOffset
         val list = mutableListOf<LookupElement>()
         while (e != null && e !is PsiFile) {
             e = e.parent
             when (e) {
-                is LuaClassMethodDefStat ->
+                is LuaClassMethodDefStat -> {
+                    var classMethodName = e.classMethodName.text
+                    list.add(LookupElementBuilder.create(removeClassName(classMethodName)))
+                    if (short)
                     {
-                        var classMethodName = e.classMethodName.text
-                        list.add(LookupElementBuilder.create(removeClassName(classMethodName)))
-                        list.add(LookupElementBuilder.create(classMethodName))
+                        return list.toTypedArray()
+                    }
+                    list.add(LookupElementBuilder.create(classMethodName))
                 }
+
                 is LuaFuncDefStat -> e.name?.let { list.add(LookupElementBuilder.create(it)) }
                 is LuaLocalFuncDefStat -> e.name?.let { list.add(LookupElementBuilder.create(it)) }
             }

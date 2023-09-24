@@ -19,6 +19,7 @@ package com.tang.intellij.lua.codeInsight.template.macro
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInsight.template.*
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.childrenOfType
@@ -42,6 +43,7 @@ class LuaCurrentClassNameMacro : Macro() {
 
     override fun calculateResult(expressions: Array<out Expression>, context: ExpressionContext?): Result? {
         var e = context?.psiElementAtStartOffset
+        val srcElement = e
         while (e != null && e !is PsiFile) {
             e = e.parent
             when (e) {
@@ -50,6 +52,12 @@ class LuaCurrentClassNameMacro : Macro() {
                     return TextResult(removeFunction(classMethodName))
                 }
             }
+        }
+        // 补充在函数外的情况
+        val name = findOutsideClassName(srcElement)
+        if (name.isNotBlank())
+        {
+            return TextResult(name)
         }
         return null
     }
@@ -68,17 +76,29 @@ class LuaCurrentClassNameMacro : Macro() {
             }
         }
         // 补充在函数外的情况
-        if (list.isEmpty() && srcElement != null) {
+        if (list.isEmpty())
+        {
+            val name = findOutsideClassName(srcElement)
+            if (name.isNotBlank())
+            {
+                list.add(LookupElementBuilder.create(name))
+            }
+        }
+        return list.toTypedArray()
+    }
+
+    private fun findOutsideClassName(srcElement: PsiElement?): String {
+        if (srcElement != null) {
             // 前一级是文件节点，向上找函数定义
             if (srcElement.parent is PsiFile) {
-                e = srcElement.prevSibling
+                var e = srcElement.prevSibling
                 while (e != null) {
                     when (e) {
                         is LuaClassMethodDefStat -> {
                             val classMethodName = e.classMethodName.text
                             val lookupString = removeFunction(classMethodName)
                             if (lookupString.isNotBlank()) {
-                                list.add(LookupElementBuilder.create(lookupString))
+                                return lookupString
                             }
                             break
                         }
@@ -87,29 +107,24 @@ class LuaCurrentClassNameMacro : Macro() {
                 }
             }
             // 还是找不到就找第一个 local xxx = {}
-                val searchContext = SearchContext.get(srcElement.project)
-            if (list.isEmpty()) {
+            val searchContext = SearchContext.get(srcElement.project)
 
-                val declarations = srcElement.containingFile.childrenOfType<LuaLocalDefStat>().filter { stat->stat.exprList?.guessType(searchContext) is TyClass }
-                declarations.forEach {
-                    if (it.comment?.tagClass != null) {
-                        list.add(LookupElementBuilder.create(it.localDefList.first().name))
-                    }
+            val declarations = srcElement.containingFile.childrenOfType<LuaLocalDefStat>().filter { stat -> stat.exprList?.guessType(searchContext) is TyClass }
+            declarations.forEach {
+                if (it.comment?.tagClass != null) {
+                    return (it.localDefList.first().name)
                 }
-                if (list.isEmpty() && declarations.isNotEmpty())
-                {
-                    list.add(LookupElementBuilder.create(declarations.first().localDefList.first().name))
-                }
+            }
+            if (declarations.isNotEmpty()) {
+                return (declarations.first().localDefList.first().name)
             }
             // 还是没有就找第一个xxx = {}
-            if (list.isEmpty()) {
-                val stat = PsiTreeUtil.getChildrenOfType(srcElement.containingFile, LuaAssignStat::class.java)?.filter { stat-> stat.valueExprList?.guessType(searchContext) is TyClass }
-                if (!stat.isNullOrEmpty()) {
-                    list.add(LookupElementBuilder.create(stat.first().varExprList.firstChild.text))
-                }
+            val stat = PsiTreeUtil.getChildrenOfType(srcElement.containingFile, LuaAssignStat::class.java)?.filter { stat -> stat.valueExprList?.guessType(searchContext) is TyClass }
+            if (!stat.isNullOrEmpty()) {
+                return stat.first().varExprList.firstChild.text
             }
         }
-        return list.toTypedArray()
+        return ""
     }
 
     override fun isAcceptableInContext(context: TemplateContextType): Boolean {
