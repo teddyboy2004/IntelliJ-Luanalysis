@@ -167,6 +167,11 @@ fun renderAliasDef(sb: StringBuilder, tag: LuaDocTagAlias, tyRenderer: ITyRender
     val cls = tag.type
     sb.append("<pre>alias ")
     sb.wrapTag("b") { tyRenderer.render(cls, sb) }
+    if (tag.ty?.getType()!=null)
+    {
+        sb.append(" ")
+        renderTy(sb, tag.ty!!.getType(), tyRenderer)
+    }
     sb.append("</pre>")
     renderCommentString(" - ", null, sb, tag.commentString)
 }

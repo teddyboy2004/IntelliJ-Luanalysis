@@ -315,9 +315,19 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
         }
 
         if (parentType != null) {
-            Ty.eachResolved(context, parentType) {
-                memberRendered = renderClassMember(context, sb, it, classMember) || memberRendered
+            if (parentType is TyClass) {
+                val resolve = (parentType as? ITyResolvable)?.resolve(context)
+                if (resolve is TyAlias)
+                {
+                    memberRendered = renderClassMember(context, sb, resolve, classMember) || memberRendered
+                }
             }
+            else{
+                Ty.eachResolved(context, parentType) {
+                    memberRendered = renderClassMember(context, sb, it, classMember) || memberRendered
+                }
+            }
+
         }
 
         if (!memberRendered) {

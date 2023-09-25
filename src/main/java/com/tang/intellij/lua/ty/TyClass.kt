@@ -37,6 +37,7 @@ import com.tang.intellij.lua.search.ProjectSearchContext
 import com.tang.intellij.lua.search.PsiSearchContext
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.stubs.*
+import com.tang.intellij.lua.stubs.index.LuaAliasIndex
 
 
 interface ITyClass : ITyResolvable {
@@ -257,6 +258,13 @@ abstract class TyClass(override val className: String,
         processAlias { alias ->
             val classMembers = manager.getClassMembers(context, alias)
             members.addAll(classMembers)
+        }
+
+        // 处理alias提示类型
+        if (members.isEmpty()&&getBuiltin(clazzName) == null)
+        {
+            val aliases = LuaAliasIndex.instance.get(clazzName, project, context.scope)
+            aliases.forEach() { it.ty?.getType()?.processMembers(context, deep, process) }
         }
 
         // 处理同时存在tablefield和luaIndex的情况下的去重，优先显示tablefield
@@ -531,6 +539,7 @@ open class TySerializedClass(name: String,
 
         return super.contravariantOf(context, other, varianceFlags)
     }
+
 }
 
 class TyLazyClass(name: String, val psi: PsiElement? = null) : TySerializedClass(name, null) {
@@ -543,6 +552,8 @@ class TyLazyClass(name: String, val psi: PsiElement? = null) : TySerializedClass
 
         super.doLazyInit(context)
     }
+
+
 }
 
 fun createSerializedClass(name: String,
