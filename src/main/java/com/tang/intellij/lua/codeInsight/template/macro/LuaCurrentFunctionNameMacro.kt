@@ -35,13 +35,22 @@ class LuaCurrentFunctionNameMacro : Macro() {
     }
 
     override fun calculateResult(expressions: Array<out Expression>, context: ExpressionContext?): Result? {
+        var param:String? = null
+        if (expressions.isNotEmpty() && expressions.first() is VariableNode) {
+            val expression = expressions.first() as VariableNode
+            param = expression.name
+        }
         var e = context?.psiElementAtStartOffset
         while (e != null && e !is PsiFile) {
             e = e.parent
             when (e) {
                 is LuaClassMethodDefStat -> {
-                    var classMethodName = e.classMethodName.text
-                    return TextResult(removeClassName(classMethodName))
+                    val classMethodName = e.classMethodName.text
+                    return if (param == "true") {
+                        TextResult(removeClassName(classMethodName))
+                    } else {
+                        TextResult(classMethodName)
+                    }
                 }
                 is LuaFuncDefStat -> return TextResult(e.name ?: "")
                 is LuaLocalFuncDefStat -> return TextResult(e.name ?: "")
@@ -51,10 +60,10 @@ class LuaCurrentFunctionNameMacro : Macro() {
     }
 
     override fun calculateLookupItems(params: Array<out Expression>, context: ExpressionContext?): Array<LookupElement>? {
-        var short = true
+        var param:String? = null
         if (params.isNotEmpty() && params.first() is VariableNode) {
             val expression = params.first() as VariableNode
-            short = expression.name == "true"
+            param = expression.name
         }
         var e = context?.psiElementAtStartOffset
         val list = mutableListOf<LookupElement>()
@@ -62,12 +71,16 @@ class LuaCurrentFunctionNameMacro : Macro() {
             e = e.parent
             when (e) {
                 is LuaClassMethodDefStat -> {
-                    var classMethodName = e.classMethodName.text
-                    list.add(LookupElementBuilder.create(removeClassName(classMethodName)))
-                    if (short)
+                    val classMethodName = e.classMethodName.text
+                    if (param == "true")
                     {
-                        return list.toTypedArray()
+                        return arrayOf(LookupElementBuilder.create(removeClassName(classMethodName)))
                     }
+                    else if (param == "false")
+                    {
+                        return arrayOf(LookupElementBuilder.create(classMethodName))
+                    }
+                    list.add(LookupElementBuilder.create(removeClassName(classMethodName)))
                     list.add(LookupElementBuilder.create(classMethodName))
                 }
 
