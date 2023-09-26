@@ -92,6 +92,7 @@
         <gotoClassContributor implementation="com.tang.intellij.lua.editor.LuaAliasNavigationContributor"/>
         <gotoSymbolContributor implementation="com.tang.intellij.lua.editor.LuaSymbolNavigationContributor"/>
         <breadcrumbsInfoProvider implementation="com.tang.intellij.lua.editor.LuaBreadcrumbsProvider"/>
+        <typeDeclarationProvider implementation="com.tang.intellij.lua.editor.LuaTypeDeclarationProvider"/>
 
         <!--completion-->
         <completion.contributor language="Lua" implementationClass="com.tang.intellij.lua.editor.completion.SmartCompletionContributor"/>
