@@ -16,6 +16,7 @@
 
 package com.tang.intellij.lua.editor.structure
 
+import com.intellij.icons.AllIcons
 import com.intellij.ide.util.treeView.smartTree.TreeElement
 import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.util.PsiTreeUtil
@@ -23,6 +24,7 @@ import com.jetbrains.rd.util.remove
 import com.tang.intellij.lua.comment.psi.LuaDocTagClass
 import com.tang.intellij.lua.comment.psi.LuaDocTagField
 import com.tang.intellij.lua.comment.psi.LuaDocVisitor
+import com.tang.intellij.lua.lang.LuaIcons
 import com.tang.intellij.lua.psi.*
 
 
@@ -367,9 +369,16 @@ class LuaStructureVisitor : LuaVisitor() {
             for (it in children) {
                 if (it is LuaTreeElement && it.name == "self") {
                     for (child in it.children) {
-                        list.add(child as LuaTreeElement)
+                        val element1 = child as LuaTreeElement
+                        element1.icon =  LuaIcons.LOCAL_VAR
+                        list.add(element1)
                     }
-                    break
+                }
+                else if (it is LuaGlobalVarElement)
+                {
+                    val treeElement = it as LuaTreeElement
+                    treeElement.name += " "
+                    list.add(treeElement)
                 }
             }
             element.clearChildren()
