@@ -382,9 +382,18 @@ class LuaStructureVisitor : LuaVisitor() {
                 }
             }
             element.clearChildren()
-            if (parent == null || list.isEmpty()) {
+            if (list.isEmpty()) {
                 return
             }
+            if(parent == null)
+            {
+                // 如果这个是静态函数的话就不做检查了，都加进去
+                list.forEach(){
+                    element.addChild(it)
+                }
+                return
+            }
+
             var parentChild = parent.children
             var index = parentChild.indexOf(element)
             for (treeElement in list) {
