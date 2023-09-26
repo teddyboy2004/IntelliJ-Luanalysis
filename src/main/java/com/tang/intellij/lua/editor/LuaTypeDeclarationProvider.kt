@@ -25,6 +25,7 @@ import com.tang.intellij.lua.stubs.index.LuaAliasIndex
 import com.tang.intellij.lua.stubs.index.LuaClassIndex
 import com.tang.intellij.lua.ty.TyAlias
 import com.tang.intellij.lua.ty.TyClass
+import com.tang.intellij.lua.ty.TyTable
 
 /**
  * Goto Symbol
@@ -36,6 +37,10 @@ class LuaTypeDeclarationProvider : TypeDeclarationPlaceAwareProvider {
             val project = p0.project
             val context = SearchContext.get(project)
             val type = p0.guessType(context)
+            if (type is TyTable)
+            {
+                return arrayOf(type.psi)
+            }
             if (type is TyClass) {
                 val className = type.className
                 val ty = type.resolve(context)
