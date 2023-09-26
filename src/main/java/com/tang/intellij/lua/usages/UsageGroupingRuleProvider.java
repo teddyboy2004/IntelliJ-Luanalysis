@@ -84,18 +84,28 @@ class LuaFuncGroupingRule extends SingleParentUsageGroupingRule {
                 int offset = ((UsageInfo2UsageAdapter) usage).getUsageInfo().getNavigationOffset();
                 containingFunc = containingFile.findElementAt(offset);
             }
+            PsiElement lastContainFunc = null;
             do {
                 containingFunc = PsiTreeUtil.getParentOfType(containingFunc, LuaFuncBodyOwner.class, true);
+                if (containingFunc == null)
+                {
+                    break;
+                }
+                lastContainFunc = containingFunc;
                 if (containingFunc instanceof LuaLocalFuncDefStat) {
                     continue;
                 }
-                if (containingFunc == null || ((LuaFuncBodyOwner) containingFunc).getName() != null) {
+                if (((LuaFuncBodyOwner<?>) containingFunc).getName() != null) {
                     break;
                 }
             } while (true);
 
             if (containingFunc != null) {
                 return new LuaFuncUsageGroup((LuaFuncBodyOwner) containingFunc, myUsageViewSettings);
+            }
+            else if (lastContainFunc!= null)
+            {
+                return new LuaFuncUsageGroup((LuaFuncBodyOwner) lastContainFunc, myUsageViewSettings);
             }
         }
         return null;
