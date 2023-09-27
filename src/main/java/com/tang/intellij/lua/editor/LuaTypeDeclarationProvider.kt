@@ -23,6 +23,7 @@ import com.tang.intellij.lua.psi.LuaPsiTypeGuessable
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.stubs.index.LuaAliasIndex
 import com.tang.intellij.lua.stubs.index.LuaClassIndex
+import com.tang.intellij.lua.ty.IPsiTy
 import com.tang.intellij.lua.ty.TyAlias
 import com.tang.intellij.lua.ty.TyClass
 import com.tang.intellij.lua.ty.TyTable
@@ -58,6 +59,10 @@ class LuaTypeDeclarationProvider : TypeDeclarationPlaceAwareProvider {
                         return arrayOf(clazz)
                     }
                 }
+            }
+            if (type is IPsiTy<*>)
+            {
+                return arrayOf(type.psi)
             }
         }
         return null
