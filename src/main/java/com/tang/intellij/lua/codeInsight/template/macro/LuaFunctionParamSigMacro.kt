@@ -19,6 +19,8 @@ package com.tang.intellij.lua.codeInsight.template.macro
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInsight.template.*
+import com.intellij.codeInsight.template.impl.ConstantNode
+import com.intellij.codeInsight.template.impl.VariableNode
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
@@ -26,7 +28,7 @@ import com.tang.intellij.lua.codeInsight.template.context.LuaFunContextType
 import com.tang.intellij.lua.psi.*
 
 class LuaFunctionParamSigMacro : Macro() {
-    override fun getPresentableName() = "LuaFunctionParamSignature()"
+    override fun getPresentableName() = "LuaFunctionParamSignature(pre, post)"
 
     override fun getName() = "LuaFunctionParamSignature"
 
@@ -43,11 +45,32 @@ class LuaFunctionParamSigMacro : Macro() {
         return isDot
     }
 
-    private fun getParam(e: LuaFuncBodyOwner<*>, isDot:Boolean):String
+    private fun getParam(e: LuaFuncBodyOwner<*>, isDot: Boolean, preStr: String, postStr: String):String
     {
         val str = e.paramSignature
         val methodName = PsiTreeUtil.getChildOfType(e, LuaClassMethodName::class.java)
         var p  = str.substring(1, str.length-1)
+        if (p.isNotBlank() && (preStr.isNotBlank() || postStr.isNotBlank()))
+        {
+            val strings = p.split(",")
+            val sb = StringBuilder()
+            strings.forEach {
+                if (sb.isNotEmpty())
+                {
+                    sb.append(", ")
+                }
+                if (preStr.isNotBlank()) {
+                    sb.append(preStr)
+                }
+                sb.append(it.trim())
+                if (postStr.isNotBlank())
+                {
+                    sb.append(postStr)
+                }
+
+            }
+            p = sb.toString()
+        }
         if (methodName != null && methodName.colon != null && isDot)
         {
             var sep = ""
@@ -61,25 +84,39 @@ class LuaFunctionParamSigMacro : Macro() {
     }
 
     override fun calculateResult(expressions: Array<out Expression>, context: ExpressionContext?): Result? {
+        var (preStr, postStr) = getExpressionStringPair(expressions)
         var e = context?.psiElementAtStartOffset
         val isDot = checkLuaBlockIsDot(e)
         while (e != null && e !is PsiFile) {
             e = e.parent
             if (e is LuaFuncBodyOwner<*>) {
-                return TextResult(getParam(e, isDot))
+                return TextResult(getParam(e, isDot, preStr, postStr))
             }
         }
         return null
     }
 
+    private fun getExpressionStringPair(expressions: Array<out Expression>): Pair<String, String> {
+        var preStr = ""
+        var postStr = ""
+        if (expressions.isNotEmpty()) {
+            preStr = expressions.first().calculateResult(null).toString()
+            if (expressions.size > 1) {
+                postStr = expressions[1].calculateResult(null).toString()
+            }
+        }
+        return Pair(preStr, postStr)
+    }
+
     override fun calculateLookupItems(params: Array<out Expression>, context: ExpressionContext?): Array<LookupElement>? {
+        val (preStr, postStr) = getExpressionStringPair(params)
         var e = context?.psiElementAtStartOffset
         val isDot = checkLuaBlockIsDot(e)
         val list = mutableListOf<LookupElement>()
         while (e != null && e !is PsiFile) {
             e = e.parent
             if (e is LuaFuncBodyOwner<*>) {
-                val param = getParam(e, isDot)
+                val param = getParam(e, isDot, preStr, postStr)
                 list.add(LookupElementBuilder.create(param))
             }
         }

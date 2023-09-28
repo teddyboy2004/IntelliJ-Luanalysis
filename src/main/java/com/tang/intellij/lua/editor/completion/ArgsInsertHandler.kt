@@ -22,7 +22,9 @@ import com.intellij.codeInsight.completion.InsertionContext
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.template.Template
 import com.intellij.codeInsight.template.TemplateManager
+import com.intellij.codeInsight.template.impl.MacroCallNode
 import com.intellij.codeInsight.template.impl.TextExpression
+import com.intellij.codeInsight.template.macro.CompleteMacro
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.psi.PsiElement
@@ -31,6 +33,7 @@ import com.intellij.psi.TokenType
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.elementType
 import com.intellij.psi.util.prevLeaf
+import com.tang.intellij.lua.codeInsight.template.macro.SuggestTypeMacro
 import com.tang.intellij.lua.project.LuaSettings
 import com.tang.intellij.lua.psi.LuaClassMethodDefStat
 import com.tang.intellij.lua.psi.LuaExpression
@@ -44,6 +47,8 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
     protected open val isVarargs = false
 
     protected open val autoInsertParameters: Boolean = LuaSettings.instance.autoInsertParameters
+
+    private var removeFirstSelf = false
 
     private var mask = -1
 
@@ -83,6 +88,7 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
             {
                 val isSuperCall = element.prevSibling.prevLeaf()?.text == "__super"
                 val preElementType = element.prevSibling.elementType
+                removeFirstSelf = preElementType == LuaTypes.COLON
                 // superCall不使用:，自动替换为.
                 if (isSuperCall && preElementType == LuaTypes.COLON)
                 {
@@ -91,7 +97,9 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
                 else if (!isSuperCall && preElementType == LuaTypes.DOT) // 自动替换.为:
                 {
                     editor.document.replaceString(startOffset - 1, startOffset, ":")
+                    removeFirstSelf = true
                 }
+
             }
         }
 
@@ -124,9 +132,20 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
                 editor.caretModel.moveToOffset(insertionContext.selectionEndOffset)
             } else {
                 editor.caretModel.moveToOffset(insertionContext.selectionEndOffset - 1)
-                AutoPopupController.getInstance(insertionContext.project).autoPopupParameterInfo(editor, element)
+//                AutoPopupController.getInstance(insertionContext.project).autoPopupParameterInfo(editor, element)
+                val manager = TemplateManager.getInstance(insertionContext.project)
+                if (params.isNotEmpty())
+                {
+                    if (params.size > 1 || params.first().name != "self" || !removeFirstSelf)
+                    {
+                        val template = manager.createTemplate("", "")
+                        template.addVariable(MacroCallNode(CompleteMacro()), true)
+                        manager.startTemplate(editor, template)
+                    }
+                }
             }
         }
+        removeFirstSelf = false
     }
 
     private fun findWarpExpr(file: PsiFile, offset: Int): LuaExpression<*>? {
@@ -148,11 +167,14 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
 
         for (i in paramDefList.indices) {
             if (mask and (1 shl i) == 0) continue
-
             val paramDef = paramDefList[i]
+            if (isFirst &&  paramDef.name == "self" && removeFirstSelf)
+            {
+                continue
+            }
             if (!isFirst)
                 template.addTextSegment(", ")
-            template.addVariable(paramDef.name, TextExpression(paramDef.name), TextExpression(paramDef.name), true)
+            template.addVariable(paramDef.name, MacroCallNode(CompleteMacro()), TextExpression(paramDef.name), true)
             isFirst = false
         }
         template.addTextSegment(")")

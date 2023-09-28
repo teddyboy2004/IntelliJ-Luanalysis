@@ -41,7 +41,7 @@ class LuaSettings : PersistentStateComponent<LuaSettings> {
     var isSmartCloseEnd: Boolean = true
 
     //在代码完成时使用参数完成模板
-    var autoInsertParameters: Boolean = false
+    var autoInsertParameters: Boolean = true
 
     var isShowWordsInFile: Boolean = true
 

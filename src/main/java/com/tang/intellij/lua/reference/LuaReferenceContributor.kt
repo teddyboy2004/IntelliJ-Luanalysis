@@ -85,7 +85,7 @@ class LuaReferenceContributor : PsiReferenceContributor() {
         }
 
         override fun getReferencesByElement(psiElement: PsiElement, processingContext: ProcessingContext): Array<PsiReference> {
-            if (psiElement is LuaLiteralExpr && psiElement.text != null && LuaFileUtil.findFile(psiElement.project, psiElement.text.replace("\"",""))!=null) {
+            if (psiElement is LuaLiteralExpr && psiElement.text != null && psiElement.text.contains(Regex("[.\\\\]"))) {
                 return arrayOf(LuaFileStringReference(psiElement))
             }
             return PsiReference.EMPTY_ARRAY
