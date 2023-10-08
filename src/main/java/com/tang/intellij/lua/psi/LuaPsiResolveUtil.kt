@@ -219,7 +219,7 @@ fun resolve(context: SearchContext, indexExpr: LuaIndexExpr, memberName: String)
     type.eachTopClass { ty ->
         val cls = (if (ty is ITyGeneric) ty.base else ty) as? ITyClass
         ret = cls?.findMember(context, memberName)?.psi
-        false
+        ret == null
     }
 
     if (ret == null) {

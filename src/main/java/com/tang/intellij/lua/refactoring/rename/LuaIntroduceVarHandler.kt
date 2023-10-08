@@ -25,6 +25,7 @@ import com.intellij.openapi.util.Pass
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.elementsAroundOffsetUp
 import com.intellij.refactoring.IntroduceTargetChooser
@@ -211,7 +212,16 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
                 {
                     commonParent = anchor?.parent
                     localDefStat = commonParent!!.addBefore(localDefStat, anchor)
-                    commonParent.addAfter(LuaElementFactory.newLine(operation.project), localDefStat)
+                    // 如果前面是有空格的话，保证格式一致避免不能正常跳转
+                    if (localDefStat.prevSibling is PsiWhiteSpace)
+                    {
+                        commonParent.addAfter(LuaElementFactory.createWith(operation.project, localDefStat.prevSibling.text), localDefStat)
+                    }
+                    else
+                    {
+                        commonParent.addAfter(LuaElementFactory.newLine(operation.project), localDefStat)
+                    }
+
                 }
 
                 operation.occurrences.forEach { occ->
@@ -225,6 +235,11 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
 
             val localDef = CodeInsightUtilCore.forcePsiPostprocessAndRestoreElement(localDefStat)?.let {
                 PsiTreeUtil.findChildOfType(it, LuaLocalDef::class.java)
+            }
+            // 上面的代码会格式化文档导致定位不准 不如不定位
+            if (operation.position != null && operation.position!!.text != operation.editor.document.getText(operation.position!!.textRange))
+            {
+                operation.position = null
             }
 
             if (localDef != null)
