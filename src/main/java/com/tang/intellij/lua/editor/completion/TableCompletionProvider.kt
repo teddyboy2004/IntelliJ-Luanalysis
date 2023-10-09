@@ -59,6 +59,11 @@ class TableCompletionProvider : ClassMemberCompletionProvider() {
             completionResultSet.addElement(b)
         }
 
+        if (PsiTreeUtil.prevVisibleLeaf(completionParameters.position)?.text == "=")
+        {
+            return
+        }
+
         val table = PsiTreeUtil.getParentOfType(completionParameters.position, LuaTableExpr::class.java)
         if (table != null) {
             val project = table.project

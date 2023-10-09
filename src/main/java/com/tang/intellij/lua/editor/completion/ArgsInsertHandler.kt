@@ -25,6 +25,7 @@ import com.intellij.codeInsight.template.TemplateManager
 import com.intellij.codeInsight.template.impl.MacroCallNode
 import com.intellij.codeInsight.template.impl.TextExpression
 import com.intellij.codeInsight.template.macro.CompleteMacro
+import com.intellij.codeInsight.template.macro.CompleteSmartMacro
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.psi.PsiElement
@@ -86,8 +87,8 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
             // 增加判断函数是否使用:，并且前面使用点自动更换成:
             if (lookupElement.psiElement is LuaClassMethodDefStat && (lookupElement.psiElement as LuaClassMethodDefStat).classMethodName.colon != null)
             {
-                val isSuperCall = element.prevSibling.prevLeaf()?.text == "__super"
-                val preElementType = element.prevSibling.elementType
+                val isSuperCall = element.prevSibling?.prevLeaf()?.text == "__super"
+                val preElementType = element.prevSibling?.elementType
                 removeFirstSelf = preElementType == LuaTypes.COLON
                 // superCall不使用:，自动替换为.
                 if (isSuperCall && preElementType == LuaTypes.COLON)
@@ -139,7 +140,7 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
                     if (params.size > 1 || params.first().name != "self" || !removeFirstSelf)
                     {
                         val template = manager.createTemplate("", "")
-                        template.addVariable(MacroCallNode(CompleteMacro()), true)
+                        template.addVariable(TextExpression(""), true)
                         manager.startTemplate(editor, template)
                     }
                 }
@@ -174,7 +175,7 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
             }
             if (!isFirst)
                 template.addTextSegment(", ")
-            template.addVariable(paramDef.name, MacroCallNode(CompleteMacro()), TextExpression(paramDef.name), true)
+            template.addVariable(paramDef.name, TextExpression(paramDef.name), TextExpression(paramDef.name), true)
             isFirst = false
         }
         template.addTextSegment(")")

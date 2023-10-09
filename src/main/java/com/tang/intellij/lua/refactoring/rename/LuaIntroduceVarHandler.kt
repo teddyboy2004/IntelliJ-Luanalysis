@@ -30,16 +30,15 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.elementsAroundOffsetUp
 import com.intellij.refactoring.IntroduceTargetChooser
 import com.intellij.refactoring.RefactoringActionHandler
+import com.intellij.refactoring.RefactoringBundle
 import com.intellij.refactoring.introduce.inplace.InplaceVariableIntroducer
 import com.intellij.refactoring.introduce.inplace.OccurrencesChooser
+import com.intellij.refactoring.introduce.inplace.OccurrencesChooser.BaseReplaceChoice
+import com.intellij.refactoring.introduce.inplace.OccurrencesChooser.ReplaceChoice
 import com.intellij.refactoring.suggested.endOffset
 import com.tang.intellij.lua.lang.LuaLanguage
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
-import com.tang.intellij.lua.search.SearchContext
-import com.tang.intellij.lua.ty.ITyFunction
-import com.tang.intellij.lua.ty.TyFunction
-import com.tang.intellij.lua.ty.TyPsiFunction
 
 
 /**
@@ -83,7 +82,6 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
         val expressions: ArrayList<LuaExpression<*>> = ArrayList();
         if (psiFile is LuaPsiFile) {
             val iterator = psiFile.elementsAroundOffsetUp(offset)
-            var context = SearchContext.get(project)
             while (iterator.hasNext()) {
                 val next = iterator.next().first
                 if (next is LuaFuncBodyOwner<*>)
@@ -145,19 +143,45 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
         {
             return
         }
-        val occurrences = getOccurrences(expression)
-        val operation = IntroduceOperation(expression, project, editor, expression.containingFile, occurrences)
-        OccurrencesChooser.simpleChooser<PsiElement>(editor).showChooser(expression, occurrences, object : Pass<OccurrencesChooser.ReplaceChoice>() {
-            override fun pass(choice: OccurrencesChooser.ReplaceChoice) {
-                operation.isReplaceAll = choice == OccurrencesChooser.ReplaceChoice.ALL
+        val occurrencesMap = LinkedHashMap<ReplaceChoice, List<PsiElement>>()
+        val list = listOf(expression)
+        var listCount = list.size
+        occurrencesMap.put(ReplaceChoice.NO, list)
+        var cur: PsiElement? = expression
+
+        do {
+            val type = PsiTreeUtil.getParentOfType(cur, LuaFuncBody::class.java)
+            if (type != null)
+            {
+                val value = getOccurrences(expression, type)
+                if (listCount != value.size)
+                {
+                    occurrencesMap.put(ReplaceChoice.ALL, value)
+                    listCount = value.size
+                }
+
+            }
+            cur = type
+        }while (cur != null)
+        if (!occurrencesMap.containsKey(ReplaceChoice.ALL))
+        {
+            val occurrences = getOccurrences(expression, expression.containingFile)
+            occurrencesMap.put(ReplaceChoice.ALL, occurrences)
+        }
+
+        val occurrences = occurrencesMap[ReplaceChoice.ALL]
+        val operation = IntroduceOperation(expression, project, editor, expression.containingFile, occurrences!!)
+        OccurrencesChooser.simpleChooser<PsiElement>(editor).showChooser(expression, occurrences, object : Pass<ReplaceChoice>() {
+            override fun pass(choice: ReplaceChoice) {
+                operation.isReplaceAll = choice == ReplaceChoice.ALL
                 WriteCommandAction.runWriteCommandAction(operation.project) { performReplace(operation) }
                 performInplaceIntroduce(operation)
             }
         })
     }
 
-    private fun getOccurrences(expression: LuaExpression<*>): List<PsiElement> {
-        return LuaRefactoringUtil.getOccurrences(expression, expression.containingFile)
+    private fun getOccurrences(expression: LuaExpression<*>, context: PsiElement?): List<PsiElement> {
+        return LuaRefactoringUtil.getOccurrences(expression, context)
     }
 
     private fun findAnchor(occurrences: List<PsiElement>?): PsiElement? {
