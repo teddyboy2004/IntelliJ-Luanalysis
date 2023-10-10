@@ -48,17 +48,18 @@ import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
 class LuaIntroduceVarHandler : RefactoringActionHandler {
 
     internal inner class IntroduceOperation(
-            val element: PsiElement,
-            val project: Project,
-            val editor: Editor,
-            val file: PsiFile,
-            var occurrences: List<PsiElement>
+        val element: PsiElement,
+        val project: Project,
+        val editor: Editor,
+        val file: PsiFile,
+        var occurrences: List<PsiElement>,
     ) {
         var isReplaceAll: Boolean = false
         var name = "var"
         var newOccurrences = mutableListOf<PsiElement>()
         var newNameElement: LuaLocalDef? = null
         var position: PsiElement? = null
+        var inline: Boolean = false
     }
 
     override fun invoke(project: Project, editor: Editor, psiFile: PsiFile, dataContext: DataContext) {
@@ -67,8 +68,7 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
         // 有选择优先判断选择项
         if (selectionModel.hasSelection()) {
             val expression = findExpressionInRange(psiFile, selectionModel.selectionStart, selectionModel.selectionEnd)
-            if (expression!=null)
-            {
+            if (expression != null) {
                 invoke(project, editor, expression)
                 return
             }
@@ -84,14 +84,12 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
             val iterator = psiFile.elementsAroundOffsetUp(offset)
             while (iterator.hasNext()) {
                 val next = iterator.next().first
-                if (next is LuaFuncBodyOwner<*>)
-                {
+                if (next is LuaFuncBodyOwner<*>) {
                     break
                 }
                 if (next is LuaExpression<*>) {
                     // 跳过调用的函数成员变量
-                    if (next is LuaIndexExpr && next.parent is LuaCallExpr)
-                    {
+                    if (next is LuaIndexExpr && next.parent is LuaCallExpr) {
                         continue
                     }
                     expressions.add(next)
@@ -104,9 +102,11 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
             0 -> {
                 return
             }
+
             1 -> {
                 invoke(project, editor, expressions[0])
             }
+
             else -> {
                 IntroduceTargetChooser.showChooser(
                     editor, expressions,
@@ -124,11 +124,9 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
 
     }
 
-    fun findExpressionInRange(file: PsiFile, startOffset: Int, endOffset: Int): LuaExpression<*>?
-    {
+    fun findExpressionInRange(file: PsiFile, startOffset: Int, endOffset: Int): LuaExpression<*>? {
         val expression = CodeInsightUtilCore.findElementInRange(file, startOffset, endOffset, LuaExpression::class.java, LuaLanguage.INSTANCE)
-        if (expression is LuaExpression)
-        {
+        if (expression is LuaExpression) {
             return expression
         }
         return null
@@ -139,37 +137,24 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
     }
 
     operator fun invoke(project: Project, editor: Editor, expression: LuaExpression<*>?) {
-        if (expression == null)
-        {
+        if (expression == null) {
             return
         }
-        val occurrencesMap = LinkedHashMap<ReplaceChoice, List<PsiElement>>()
-        val list = listOf(expression)
-        var listCount = list.size
-        occurrencesMap.put(ReplaceChoice.NO, list)
         var cur: PsiElement? = expression
 
+        var occurrences: List<PsiElement>? = null
         do {
             val type = PsiTreeUtil.getParentOfType(cur, LuaFuncBody::class.java)
-            if (type != null)
-            {
-                val value = getOccurrences(expression, type)
-                if (listCount != value.size)
-                {
-                    occurrencesMap.put(ReplaceChoice.ALL, value)
-                    listCount = value.size
-                }
-
+            if (type != null) {
+                occurrences = getOccurrences(expression, type)
+                break
             }
             cur = type
-        }while (cur != null)
-        if (!occurrencesMap.containsKey(ReplaceChoice.ALL))
-        {
-            val occurrences = getOccurrences(expression, expression.containingFile)
-            occurrencesMap.put(ReplaceChoice.ALL, occurrences)
+        } while (cur != null)
+        if (occurrences == null) {
+            occurrences = getOccurrences(expression, expression.containingFile)
         }
 
-        val occurrences = occurrencesMap[ReplaceChoice.ALL]
         val operation = IntroduceOperation(expression, project, editor, expression.containingFile, occurrences!!)
         OccurrencesChooser.simpleChooser<PsiElement>(editor).showChooser(expression, occurrences, object : Pass<ReplaceChoice>() {
             override fun pass(choice: ReplaceChoice) {
@@ -223,32 +208,27 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
                     element = element.parent
                 localDefStat = element.replace(localDefStat)
                 operation.position = localDefStat
+                operation.inline = true
             } else {
                 val anchor = findAnchor(operation.occurrences)
 
-                if (anchor == operation.occurrences.first().parent && anchor is LuaExprStat)
-                {
+                if (anchor == operation.occurrences.first().parent && anchor is LuaExprStat) {
                     localDefStat = element.replace(localDefStat)
                     operation.position = localDefStat
                     needSetPosition = false
-                }
-                else
-                {
+                } else {
                     commonParent = anchor?.parent
                     localDefStat = commonParent!!.addBefore(localDefStat, anchor)
                     // 如果前面是有空格的话，保证格式一致避免不能正常跳转
-                    if (localDefStat.prevSibling is PsiWhiteSpace)
-                    {
+                    if (localDefStat.prevSibling is PsiWhiteSpace) {
                         commonParent.addAfter(LuaElementFactory.createWith(operation.project, localDefStat.prevSibling.text), localDefStat)
-                    }
-                    else
-                    {
+                    } else {
                         commonParent.addAfter(LuaElementFactory.newLine(operation.project), localDefStat)
                     }
 
                 }
 
-                operation.occurrences.forEach { occ->
+                operation.occurrences.forEach { occ ->
                     var identifier = LuaElementFactory.createName(operation.project, operation.name)
                     identifier = occ.replace(identifier)
                     operation.newOccurrences.add(identifier)
@@ -261,8 +241,7 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
                 PsiTreeUtil.findChildOfType(it, LuaLocalDef::class.java)
             }
             // 上面的代码会格式化文档导致定位不准 不如不定位
-            if (operation.position != null && operation.position!!.text != operation.editor.document.getText(operation.position!!.textRange))
-            {
+            if (operation.position != null && operation.position!!.text != operation.editor.document.getText(operation.position!!.textRange)) {
                 operation.position = null
             }
 
@@ -277,12 +256,12 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
     }
 
     private inner class LuaIntroduce(val operation: IntroduceOperation) : InplaceVariableIntroducer<PsiElement>(
-            operation.newNameElement,
-            operation.editor,
-            operation.project,
-            "Introduce Variable",
-            operation.newOccurrences.toTypedArray(),
-            null // 避免因为在闭包里，导致报错
+        operation.newNameElement,
+        operation.editor,
+        operation.project,
+        "Introduce Variable",
+        operation.newOccurrences.toTypedArray(),
+        null // 避免因为在闭包里，导致报错
     ) {
 
         init { // 补充闭包对应处理逻辑
@@ -297,8 +276,13 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
 
         override fun moveOffsetAfter(success: Boolean) {
             val position = exprMarker
-            if (position != null)
-                operation.editor.caretModel.moveToOffset(position.endOffset)
+            if (position != null) {
+                var offset = position.endOffset
+                if (!operation.inline) {
+                    offset = (position.startOffset + myInsertedName.length)
+                }
+                operation.editor.caretModel.moveToOffset(offset)
+            }
             super.moveOffsetAfter(success)
         }
     }

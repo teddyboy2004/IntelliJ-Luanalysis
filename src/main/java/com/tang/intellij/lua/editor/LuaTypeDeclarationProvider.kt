@@ -44,8 +44,7 @@ class LuaTypeDeclarationProvider : TypeDeclarationPlaceAwareProvider {
             }
             if (type is TyClass) {
                 val className = type.className
-                val ty = type.resolve(context)
-                if (ty is TyAlias)
+                if (type.aliasTy != null)
                 {
                     val alias = LuaAliasIndex.find(context, className)
                     if (alias != null) {

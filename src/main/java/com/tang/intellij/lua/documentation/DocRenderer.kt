@@ -19,6 +19,8 @@ package com.tang.intellij.lua.documentation
 import com.intellij.codeInsight.documentation.DocumentationManagerUtil
 import com.intellij.openapi.editor.impl.EditorCssFontResolver
 import com.intellij.psi.PsiElement
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.childrenOfType
 import com.tang.intellij.lua.comment.psi.*
 import com.tang.intellij.lua.comment.psi.api.LuaComment
 import com.tang.intellij.lua.search.ProjectSearchContext
@@ -302,7 +304,25 @@ private fun renderOverload(sb: StringBuilder, tagOverload: LuaDocTagOverload, ty
 }
 
 private fun renderTypeDef(sb: StringBuilder, tagType: LuaDocTagType, tyRenderer: ITyRenderer) {
-    renderTy(sb, tagType.getType(), tyRenderer)
+    val ty = tagType.getType()
+    if (ty is TyLazyClass)
+    {
+        ty.lazyInit(SearchContext.get(tagType.project))
+        if (ty.aliasTy != null) {
+            sb.append("<pre>alias ")
+            sb.wrapTag("b") { tyRenderer.render(ty.aliasTy!!, sb) }
+            if (ty.aliasTy!=null)
+            {
+                sb.append(" ")
+                renderTy(sb, ty.aliasTy!!.ty, tyRenderer)
+            }
+            sb.append("</pre>")
+            renderCommentString(" - ", null, sb, tagType.commentString)
+            return
+        }
+    }
+    renderTy(sb, ty, tyRenderer)
+    renderCommentString(" - ", null, sb, tagType.commentString)
 }
 
 private fun renderSee(sb: StringBuilder, see: LuaDocTagSee, tyRenderer: ITyRenderer) {

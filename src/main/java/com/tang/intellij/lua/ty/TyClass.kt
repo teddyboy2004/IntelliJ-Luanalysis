@@ -179,6 +179,8 @@ abstract class TyClass(override val className: String,
 
     final override var aliasName: String? = null
 
+    var aliasTy: TyAlias? = null
+
     final override val identifier: String get() = className
 
     private var _lazyInitialized: Boolean = false
@@ -261,10 +263,8 @@ abstract class TyClass(override val className: String,
         }
 
         // 处理alias提示类型
-        if (members.isEmpty()&&getBuiltin(clazzName) == null)
-        {
-            val aliases = LuaAliasIndex.instance.get(clazzName, project, context.scope)
-            aliases.forEach() { it.ty?.getType()?.processMembers(context, deep, process) }
+        if (getBuiltin(clazzName) == null && this.aliasTy != null) {
+            this.aliasTy!!.ty.processMembers(context, deep, process)
         }
 
         // 处理同时存在tablefield和luaIndex的情况下的去重，优先显示tablefield
@@ -551,6 +551,11 @@ class TyLazyClass(name: String, val psi: PsiElement? = null) : TySerializedClass
         }
 
         super.doLazyInit(context)
+        when (val iTy = this.resolve(context)) {
+            is TyAlias -> {
+                aliasTy = iTy
+            }
+        }
     }
 
 

@@ -17,6 +17,7 @@
 package com.tang.intellij.lua.documentation
 
 import com.intellij.codeInsight.documentation.DocumentationManagerUtil
+import com.intellij.execution.process.elevation.settings.ElevationSettings
 import com.intellij.lang.documentation.AbstractDocumentationProvider
 import com.intellij.lang.documentation.DocumentationProvider
 import com.intellij.psi.PsiComment
@@ -165,8 +166,14 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                     if (parenthesesRequired) {
                         sb.append("(")
                     }
-
-                    renderTy(sb, renderedParentTy, tyRenderer)
+                    if (renderedParentTy is TyLazyClass)
+                    {
+                        sb.append(renderedParentTy.className)
+                    }
+                    else
+                    {
+                        renderTy(sb, renderedParentTy, tyRenderer)
+                    }
 
                     if (parenthesesRequired) {
                         sb.append(")")
@@ -200,7 +207,6 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                     if (parenthesesRequired) {
                         sb.append("(")
                     }
-
                     renderTy(sb, ty, tyRenderer)
 
                     if (parenthesesRequired) {
@@ -218,6 +224,7 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
         val commentOwner = classMember as? LuaCommentOwner ?: effectiveMember as? LuaCommentOwner
 
         if (commentOwner != null) {
+
             if (commentOwner.comment != null) {
                 renderComment(sb, commentOwner.comment, tyRenderer)
             }
@@ -238,8 +245,20 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                         current = PsiTreeUtil.nextVisibleLeaf(current)
                     }
                 }
-
+                if (ty is TyLazyClass)
+                {
+                    ty.lazyInit(context)
+                    if (ty.aliasTy != null)
+                    {
+                        sb.append("<pre>alias ")
+                        sb.wrapTag("b") { sb.append(ty.className) }
+                        sb.append(" ")
+                        renderTy(sb, ty.aliasTy!!.ty, tyRenderer)
+                        sb.append("</pre>")
+                    }
+                }
             }
+
             return true
         }
 
@@ -315,12 +334,8 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
         }
 
         if (parentType != null) {
-            if (parentType is TyClass) {
-                val resolve = (parentType as? ITyResolvable)?.resolve(context)
-                if (resolve is TyAlias)
-                {
-                    memberRendered = renderClassMember(context, sb, resolve, classMember) || memberRendered
-                }
+            if (parentType is TyLazyClass) {
+                memberRendered = renderClassMember(context, sb, parentType, classMember) || memberRendered
             }
             else{
                 Ty.eachResolved(context, parentType) {

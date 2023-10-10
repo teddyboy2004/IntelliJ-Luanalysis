@@ -23,6 +23,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.suggested.startOffset
 import com.tang.intellij.lua.Constants
+import com.tang.intellij.lua.comment.psi.LuaDocCommentString
 import com.tang.intellij.lua.comment.psi.LuaDocTagField
 import com.tang.intellij.lua.comment.psi.api.LuaComment
 import com.tang.intellij.lua.psi.LuaCommentOwner
@@ -350,6 +351,9 @@ open class TyRenderer : TyVisitor(), ITyRenderer {
             clazz is TyPsiDocClass && this.showStructComment ->{
                 renderClassMember(clazz)
             }
+            clazz is TyLazyClass && clazz.aliasTy != null -> {
+                "alias <b>${clazz.className}</b> ${renderClass(clazz.aliasTy!!.ty as TyClass)}"
+            }
             clazz.isAnonymous -> {
                 if (isSuffixedClass(clazz)) {
                     clazz.varName?.let { return it }
@@ -363,7 +367,11 @@ open class TyRenderer : TyVisitor(), ITyRenderer {
     }
 
     // 优化类成员提示，增加显示注释
-    fun renderClassMember(clazz: TyClass): String {
+    fun renderClassMember(clazz: TyClass?): String {
+        if (clazz == null)
+        {
+            return ""
+        }
         var proj: Project? = null
         if (clazz is TyTable) {
             proj = clazz.psi.project
@@ -392,7 +400,12 @@ open class TyRenderer : TyVisitor(), ITyRenderer {
                 if (member is LuaCommentOwner) {
                     if (member.comment != null) {
                         var child = member.comment
-                        comment.append(child!!.text)
+                        val string = PsiTreeUtil.findChildOfType(child, LuaDocCommentString::class.java)
+                        if (string!= null && string.text.isNotBlank())
+                        {
+                            comment.append("---")
+                            comment.append(string.text)
+                        }
                     } else {
                         val doc = PsiDocumentManager.getInstance(context.project).getDocument(member.containingFile)
                         if (doc != null) {
