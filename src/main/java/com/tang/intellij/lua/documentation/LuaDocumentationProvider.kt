@@ -44,6 +44,7 @@ import com.tang.intellij.lua.ty.*
  */
 class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationProvider {
 
+
     private val renderer = object : TyRenderer() {
         override fun renderTypeName(t: String): String {
             return if (t.isNotEmpty()) buildString {
@@ -61,16 +62,40 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
         }
     }
 
+    fun buildQuickString(builderAction: StringBuilder.() -> Unit) : String {
+        return buildString {
+            renderer.showStructComment = true
+            builderAction()
+            renderer.showStructComment = false
+        }
+    }
+
     override fun getQuickNavigateInfo(element: PsiElement?, originalElement: PsiElement?): String? {
         if (element is LuaPsiTypeGuessable) {
             val context = if (originalElement != null) PsiSearchContext(originalElement) else SearchContext.get(element.project)
-            val ty = element.guessType(context)
+            var ty = element.guessType(context)
             if (ty != null) {
-                return buildString {
-                    renderer.showStructComment = true
-                    renderTy(this, ty, renderer)
-                    renderer.showStructComment = false
+                if (ty is TyLazyClass)
+                {
+                    ty.doLazyInit(context)
+                    if (ty.aliasTy == null)
+                    {
+                        val find = LuaClassIndex.find(context, ty.className)
+                        if (find!= null && find!=ty)
+                        {
+                            ty = find.type
+                        }
+                    }
                 }
+                return buildQuickString {
+                    renderTy(this, ty, renderer)
+                }
+            }
+        }
+        else if(element is LuaDocTagClass)
+        {
+            return buildQuickString {
+                renderTy(this, element.type, renderer)
             }
         }
         return super<AbstractDocumentationProvider>.getQuickNavigateInfo(element, originalElement)
@@ -93,14 +118,31 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
         when (element) {
             is LuaParamDef -> renderParamDef(sb, element, originalElement)
             is LuaDocTagAlias -> renderAliasDef(sb, element, tyRenderer)
-            is LuaDocTagClass -> renderClassDef(sb, element, tyRenderer)
-            is LuaPsiTypeMember -> renderClassMember(sb, element)
+            is LuaDocTagClass -> {
+                tyRenderer.showStructComment = true
+                renderClassDef(sb, element, tyRenderer)
+                tyRenderer.showStructComment = false
+            }
+            is LuaPsiTypeMember -> {
+                renderClassMember(sb, element)
+            }
             is LuaLocalDef -> { //local xx
 
+                val owner = PsiTreeUtil.getParentOfType(element, LuaCommentOwner::class.java)
                 renderDefinition(sb) {
                     val context = if (originalElement != null) PsiSearchContext(originalElement) else SearchContext.get(element.project)
-                    val ty = element.guessType(context) ?: Primitives.UNKNOWN
-
+                    var ty = element.guessType(context) ?: Primitives.UNKNOWN
+                    if (ty is TyLazyClass)
+                    {
+                        ty.lazyInit(context)
+                        if (ty.aliasTy == null && ty.psi == null) {
+                            val find = LuaClassIndex.find(context, ty.className)
+                            if (find != null)
+                            {
+                                ty = find.type
+                            }
+                        }
+                    }
                     sb.append("local <b>${element.name}</b>: ")
                     renderer.showStructComment = true
                     if (renderer.isMemberPunctuationRequired(ty)) {
@@ -111,7 +153,6 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                     renderer.showStructComment = false
                 }
 
-                val owner = PsiTreeUtil.getParentOfType(element, LuaCommentOwner::class.java)
                 owner?.let { renderComment(sb, owner.comment, tyRenderer) }
             }
 
@@ -226,7 +267,9 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
         if (commentOwner != null) {
 
             if (commentOwner.comment != null) {
+                tyRenderer.showStructComment = true
                 renderComment(sb, commentOwner.comment, tyRenderer)
+                tyRenderer.showStructComment = false
             }
             else
             {
@@ -250,7 +293,7 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                     ty.lazyInit(context)
                     if (ty.aliasTy != null)
                     {
-                        sb.append("<pre>alias ")
+                        sb.append("<pre style=\"font-family:'Microsoft YaHei'\">alias ")
                         sb.wrapTag("b") { sb.append(ty.className) }
                         sb.append(" ")
                         renderTy(sb, ty.aliasTy!!.ty, tyRenderer)
@@ -258,7 +301,6 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                     }
                 }
             }
-
             return true
         }
 

@@ -354,6 +354,9 @@ open class TyRenderer : TyVisitor(), ITyRenderer {
             clazz is TyLazyClass && clazz.aliasTy != null -> {
                 "alias <b>${clazz.className}</b> ${renderClass(clazz.aliasTy!!.ty as TyClass)}"
             }
+            clazz is TyLazyClass && this.showStructComment ->{
+                renderClassMember(clazz)
+            }
             clazz.isAnonymous -> {
                 if (isSuffixedClass(clazz)) {
                     clazz.varName?.let { return it }
@@ -426,7 +429,11 @@ open class TyRenderer : TyVisitor(), ITyRenderer {
                 }
                 if(member is LuaDocTagField)
                 {
-
+                    val string = member.commentString
+                    if (string!= null && string.text.isNotBlank())
+                    {
+                        comment.append(string.text.replace(Regex("^@"), ""))
+                    }
                 }
                 if (comment.isEmpty())
                 {

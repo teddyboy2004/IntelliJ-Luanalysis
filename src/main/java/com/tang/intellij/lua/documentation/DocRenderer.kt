@@ -25,6 +25,7 @@ import com.tang.intellij.lua.comment.psi.*
 import com.tang.intellij.lua.comment.psi.api.LuaComment
 import com.tang.intellij.lua.search.ProjectSearchContext
 import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.stubs.index.LuaClassIndex
 import com.tang.intellij.lua.ty.*
 
 inline fun StringBuilder.wrap(prefix: String, postfix: String, crossinline body: () -> Unit) {
@@ -167,7 +168,7 @@ private fun renderReturn(sb: StringBuilder, tagReturn: LuaDocTagReturn, tyRender
 
 fun renderAliasDef(sb: StringBuilder, tag: LuaDocTagAlias, tyRenderer: ITyRenderer) {
     val cls = tag.type
-    sb.append("<pre>alias ")
+    sb.append("<pre style=\"font-family:'Microsoft YaHei'\">alias ")
     sb.wrapTag("b") { tyRenderer.render(cls, sb) }
     if (tag.ty?.getType()!=null)
     {
@@ -180,9 +181,9 @@ fun renderAliasDef(sb: StringBuilder, tag: LuaDocTagAlias, tyRenderer: ITyRender
 
 fun renderClassDef(sb: StringBuilder, tag: LuaDocTagClass, tyRenderer: ITyRenderer) {
     val cls = tag.type
-    sb.append("<pre>")
+    sb.append("<pre style=\"font-family:'Microsoft YaHei'\">")
     sb.append(if (tag.isShape) "shape " else "class ")
-    sb.wrapTag("b") { tyRenderer.render(cls, sb) }
+    sb.wrapTag("b") { sb.append(cls.className) }
 
     cls.superClass?.let { superClass ->
         sb.append(" : ")
@@ -193,6 +194,13 @@ fun renderClassDef(sb: StringBuilder, tag: LuaDocTagClass, tyRenderer: ITyRender
         } else {
             sb.append(superClass)
         }
+    }
+
+    if (tyRenderer is TyRenderer && tyRenderer.showStructComment)
+    {
+        val stringbuilder = StringBuilder()
+        renderTy(stringbuilder, cls, tyRenderer)
+        sb.append(stringbuilder.substring(cls.className.length))
     }
 
     sb.append("</pre>")
@@ -304,13 +312,13 @@ private fun renderOverload(sb: StringBuilder, tagOverload: LuaDocTagOverload, ty
 }
 
 private fun renderTypeDef(sb: StringBuilder, tagType: LuaDocTagType, tyRenderer: ITyRenderer) {
-    val ty = tagType.getType()
+    var ty = tagType.getType()
     if (ty is TyLazyClass)
     {
         ty.lazyInit(SearchContext.get(tagType.project))
         if (ty.aliasTy != null) {
-            sb.append("<pre>alias ")
-            sb.wrapTag("b") { tyRenderer.render(ty.aliasTy!!, sb) }
+            sb.append("<pre style=\"font-family:'Microsoft YaHei'\">alias ")
+            sb.wrapTag("b") { tyRenderer.render((ty as TyLazyClass).aliasTy!!, sb) }
             if (ty.aliasTy!=null)
             {
                 sb.append(" ")
@@ -319,6 +327,15 @@ private fun renderTypeDef(sb: StringBuilder, tagType: LuaDocTagType, tyRenderer:
             sb.append("</pre>")
             renderCommentString(" - ", null, sb, tagType.commentString)
             return
+        }
+        else
+        {
+            val find = LuaClassIndex.find(SearchContext.get(tagType.project), ty.className)
+            if(find!= null)
+            {
+                renderClassDef(sb,find,tyRenderer)
+                return
+            }
         }
     }
     renderTy(sb, ty, tyRenderer)
