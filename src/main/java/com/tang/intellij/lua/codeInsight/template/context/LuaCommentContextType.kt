@@ -20,14 +20,10 @@ import com.intellij.codeInsight.template.TemplateContextType
 import com.intellij.psi.PsiComment
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
-import com.tang.intellij.lua.psi.LuaFuncBody
 
-class LuaFunContextType : TemplateContextType("LUA_FUNCTION", "function", LuaCodeContextType::class.java) {
+class LuaCommentContextType : TemplateContextType("LUA_COMMENT", "comment", LuaCodeContextType::class.java) {
 
     override fun isInContext(psiFile: PsiFile, i: Int): Boolean {
-        if (PsiTreeUtil.findElementOfClassAtOffset(psiFile,i, PsiComment::class.java, false) != null) {
-            return false
-        }
-        return PsiTreeUtil.findElementOfClassAtOffset(psiFile, i, LuaFuncBody::class.java, false) != null
+        return PsiTreeUtil.findElementOfClassAtOffset(psiFile, i, PsiComment::class.java, false) != null
     }
 }

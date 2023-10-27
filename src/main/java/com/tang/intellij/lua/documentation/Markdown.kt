@@ -58,7 +58,7 @@ private fun MarkdownNode.toHtml(): String {
             sb.append("<$tag>")
             processChildren()
             sb.append("</$tag>")
-            if (newline) sb.appendln()
+            if (newline) sb.appendLine()
         }
 
         val nodeType = node.type
@@ -143,7 +143,7 @@ private fun MarkdownNode.toHtml(): String {
                     sb.append("\n")
                 }
                 else {
-                    sb.append(" ")
+                    sb.append("<br>")
                 }
             }
             MarkdownTokenTypes.GT -> sb.append("&gt;")

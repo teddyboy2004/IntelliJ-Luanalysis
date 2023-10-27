@@ -113,7 +113,7 @@ class LuaFuncGroupingRule extends SingleParentUsageGroupingRule {
 
     private static class LuaFuncUsageGroup implements UsageGroup, DataProvider {
         private final SmartPsiElementPointer<LuaFuncBodyOwner> myFuncPointer;
-        private final @NlsSafe String myName;
+        private final String myName;
         private final Icon myIcon;
         private final Project myProject;
 
@@ -121,7 +121,7 @@ class LuaFuncGroupingRule extends SingleParentUsageGroupingRule {
         private final UsageViewSettings myUsageViewSettings;
 
         LuaFuncUsageGroup(LuaFuncBodyOwner psiFunc, @NotNull UsageViewSettings usageViewSettings) {
-            myName = psiFunc.getName();
+            myName = psiFunc.getName() == null ? "" : psiFunc.getName();
             myProject = psiFunc.getProject();
             myFuncPointer = SmartPointerManager.getInstance(myProject).createSmartPsiElementPointer(psiFunc);
 

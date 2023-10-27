@@ -200,7 +200,22 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
         var commonParent = PsiTreeUtil.findCommonParent(operation.occurrences)
         if (commonParent != null) {
             var element = operation.element
-            var localDefStat: PsiElement = LuaElementFactory.createWith(operation.project, "local var = " + element.text)
+            val text = element.text
+            var localDefStat: PsiElement
+            if (element is LuaCommentOwner && element.comment != null)
+            {
+                val commentText = element.comment!!.text
+                var whiteSpace = ""
+                if (element.prevSibling is PsiWhiteSpace) {
+                    whiteSpace = element.prevSibling.text
+                }
+
+                localDefStat = LuaElementFactory.createWith(operation.project,  commentText +"\n" + whiteSpace+ "local var = " + text.replace(commentText, ""))
+            }
+            else
+            {
+                localDefStat = LuaElementFactory.createWith(operation.project, "local var = " + text)
+            }
             var needSetPosition = true
             val inline = isInline(commonParent, operation)
             if (inline) {

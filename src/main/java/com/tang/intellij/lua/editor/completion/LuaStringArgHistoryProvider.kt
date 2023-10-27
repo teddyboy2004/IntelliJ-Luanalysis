@@ -16,10 +16,14 @@
 
 package com.tang.intellij.lua.editor.completion
 
+import com.intellij.codeInsight.completion.InsertHandler
+import com.intellij.codeInsight.completion.InsertionContext
+import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.refactoring.suggested.endOffset
 import com.tang.intellij.lua.lang.LuaIcons
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.stubs.index.LuaStringArgIndex
@@ -27,9 +31,9 @@ import com.tang.intellij.lua.stubs.index.LuaStringArgIndex
 class LuaStringArgHistoryProvider : LuaCompletionProvider() {
     companion object {
         val STRING_ARG = PlatformPatterns.psiElement(LuaTypes.STRING)
-                .withParent(
-                        PlatformPatterns.psiElement(LuaTypes.LITERAL_EXPR).withParent(LuaArgs::class.java)
-                )
+            .withParent(
+                PlatformPatterns.psiElement(LuaTypes.LITERAL_EXPR).withParent(LuaArgs::class.java)
+            )
     }
 
     override fun addCompletions(session: CompletionSession) {
@@ -44,9 +48,22 @@ class LuaStringArgHistoryProvider : LuaCompletionProvider() {
                     LookupElementBuilder.create(arg.argString)
                         .withIcon(LuaIcons.STRING_ARG_HISTORY)
                         .withTypeText("History", true)
+                        .withInsertHandler(OverrideInsertHandler())
                 )
             }
             true
+        }
+    }
+
+    internal class OverrideInsertHandler() : InsertHandler<LookupElement> {
+        override fun handleInsert(insertionContext: InsertionContext, lookupElement: LookupElement) {
+            val startOffset = insertionContext.startOffset
+            val element = insertionContext.file.findElementAt(startOffset)
+            val editor = insertionContext.editor
+            if (element != null) {
+                val endOffset = element.endOffset
+                editor.caretModel.moveToOffset(endOffset)
+            }
         }
     }
 }

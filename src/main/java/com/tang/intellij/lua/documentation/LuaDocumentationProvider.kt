@@ -62,7 +62,7 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
         }
     }
 
-    fun buildQuickString(builderAction: StringBuilder.() -> Unit) : String {
+    fun buildQuickString(builderAction: StringBuilder.() -> Unit): String {
         return buildString {
             renderer.showStructComment = true
             builderAction()
@@ -75,14 +75,11 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
             val context = if (originalElement != null) PsiSearchContext(originalElement) else SearchContext.get(element.project)
             var ty = element.guessType(context)
             if (ty != null) {
-                if (ty is TyLazyClass)
-                {
+                if (ty is TyLazyClass) {
                     ty.doLazyInit(context)
-                    if (ty.aliasTy == null)
-                    {
+                    if (ty.aliasTy == null) {
                         val find = LuaClassIndex.find(context, ty.className)
-                        if (find!= null && find!=ty)
-                        {
+                        if (find != null && find != ty) {
                             ty = find.type
                         }
                     }
@@ -91,9 +88,7 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                     renderTy(this, ty, renderer)
                 }
             }
-        }
-        else if(element is LuaDocTagClass)
-        {
+        } else if (element is LuaDocTagClass) {
             return buildQuickString {
                 renderTy(this, element.type, renderer)
             }
@@ -123,22 +118,22 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                 renderClassDef(sb, element, tyRenderer)
                 tyRenderer.showStructComment = false
             }
+
             is LuaPsiTypeMember -> {
                 renderClassMember(sb, element)
             }
+
             is LuaLocalDef -> { //local xx
 
                 val owner = PsiTreeUtil.getParentOfType(element, LuaCommentOwner::class.java)
                 renderDefinition(sb) {
                     val context = if (originalElement != null) PsiSearchContext(originalElement) else SearchContext.get(element.project)
                     var ty = element.guessType(context) ?: Primitives.UNKNOWN
-                    if (ty is TyLazyClass)
-                    {
+                    if (ty is TyLazyClass) {
                         ty.lazyInit(context)
                         if (ty.aliasTy == null && ty.psi == null) {
                             val find = LuaClassIndex.find(context, ty.className)
-                            if (find != null)
-                            {
+                            if (find != null) {
                                 ty = find.type
                             }
                         }
@@ -207,12 +202,9 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                     if (parenthesesRequired) {
                         sb.append("(")
                     }
-                    if (renderedParentTy is TyLazyClass)
-                    {
+                    if (renderedParentTy is TyLazyClass) {
                         sb.append(renderedParentTy.className)
-                    }
-                    else
-                    {
+                    } else {
                         renderTy(sb, renderedParentTy, tyRenderer)
                     }
 
@@ -270,16 +262,13 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                 tyRenderer.showStructComment = true
                 renderComment(sb, commentOwner.comment, tyRenderer)
                 tyRenderer.showStructComment = false
-            }
-            else
-            {
+            } else {
                 val doc = PsiDocumentManager.getInstance(context.project).getDocument(commentOwner.containingFile)
                 if (doc != null) {
                     val lineNumber = doc.getLineNumber(commentOwner.startOffset)
                     var current: PsiElement? = PsiTreeUtil.nextVisibleLeaf(commentOwner)
                     // 支持同一行的--注释
-                    while (current != null && lineNumber == doc.getLineNumber(current.startOffset))
-                    {
+                    while (current != null && lineNumber == doc.getLineNumber(current.startOffset)) {
                         if (current is PsiComment && current !is LuaComment) {
                             // 同一行的注释
                             sb.append(current.text)
@@ -288,11 +277,9 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                         current = PsiTreeUtil.nextVisibleLeaf(current)
                     }
                 }
-                if (ty is TyLazyClass)
-                {
+                if (ty is TyLazyClass) {
                     ty.lazyInit(context)
-                    if (ty.aliasTy != null)
-                    {
+                    if (ty.aliasTy != null) {
                         sb.append("<pre style=\"font-family:'Microsoft YaHei'\">alias ")
                         sb.wrapTag("b") { sb.append(ty.className) }
                         sb.append(" ")
@@ -338,25 +325,32 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                 if (parent == null || parent is LuaPsiFile) {
                     break
                 }
-                when(parent)
-                {
+                when (parent) {
                     is LuaTableField -> {
                         parentName = parent.name
                         if (parentName == null) {
                             val indexName = parent.guessIndexType(context)?.displayName
-                            if (indexName!=null) {
+                            if (indexName != null) {
                                 tableIndexStr = "$tableIndexStr[$indexName]"
                             }
                         }
                     }
-                    is LuaPsiTypeMember ->{parentName = parent.name}
-                    is LuaLocalDefStat ->{parentName = parent.localDefList[0]?.name}
-                    is LuaAssignStat -> {parentName = parent.varExprList.text }
+
+                    is LuaPsiTypeMember -> {
+                        parentName = parent.name
+                    }
+
+                    is LuaLocalDefStat -> {
+                        parentName = parent.localDefList[0]?.name
+                    }
+
+                    is LuaAssignStat -> {
+                        parentName = parent.varExprList.text
+                    }
                 }
                 parent = parent.parent
             }
-            if (parentName != null)
-            {
+            if (parentName != null) {
                 renderDefinition(sb)
                 {
                     sb.append("<b>")
@@ -370,16 +364,14 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
                 }
                 parentType = null
             }
-        }else if(parentType is TySubstitutedDocTable || (parentType is TyClass && parentType.displayName == Constants.WORD_G))
-        {
+        } else if (parentType is TySubstitutedDocTable || (parentType is TyClass && parentType.displayName == Constants.WORD_G)) {
             parentType = null
         }
 
         if (parentType != null) {
             if (parentType is TyLazyClass) {
                 memberRendered = renderClassMember(context, sb, parentType, classMember) || memberRendered
-            }
-            else{
+            } else {
                 Ty.eachResolved(context, parentType) {
                     memberRendered = renderClassMember(context, sb, it, classMember) || memberRendered
                 }
@@ -397,6 +389,8 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
         val docParamDef = owner?.comment?.getParamDef(paramDef.name)
         val tyRenderer = renderer
 
+        tyRenderer.showStructComment = true
+        sb.append("<pre style=\"font-family:'Microsoft YaHei'\">")
         if (docParamDef != null) {
             val withinImplementation = originalElement?.let { PsiTreeUtil.isAncestor(owner, it, true) } ?: false
             renderDocParam(sb, docParamDef, withinImplementation, tyRenderer, true)
@@ -406,5 +400,7 @@ class LuaDocumentationProvider : AbstractDocumentationProvider(), DocumentationP
             sb.append("<b>param</b> <code>${paramDef.name}</code> : ")
             renderTy(sb, ty, tyRenderer)
         }
+        sb.append("</pre>")
+        tyRenderer.showStructComment = false
     }
 }

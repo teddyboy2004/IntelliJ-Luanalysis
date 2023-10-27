@@ -122,7 +122,7 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
     }
 
     protected open fun appendSignature(insertionContext: InsertionContext, editor: Editor, element: PsiElement?) {
-        if (autoInsertParameters) {
+        if (autoInsertParameters && insertionContext.completionChar != '\n') {
             val manager = TemplateManager.getInstance(insertionContext.project)
             val template = createTemplate(manager, params)
             editor.caretModel.moveToOffset(insertionContext.selectionEndOffset)
@@ -133,7 +133,7 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
                 editor.caretModel.moveToOffset(insertionContext.selectionEndOffset)
             } else {
                 editor.caretModel.moveToOffset(insertionContext.selectionEndOffset - 1)
-//                AutoPopupController.getInstance(insertionContext.project).autoPopupParameterInfo(editor, element)
+                AutoPopupController.getInstance(insertionContext.project).autoPopupParameterInfo(editor, element)
                 val manager = TemplateManager.getInstance(insertionContext.project)
                 if (params.isNotEmpty())
                 {

@@ -17,7 +17,6 @@
 package com.tang.intellij.lua.project;
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.project.Project;
@@ -59,6 +58,7 @@ public class LuaSettingsPanel implements SearchableConfigurable, Configurable.No
     private JTextField requireFunctionNames;
     private JTextField tooLargerFileThreshold;
     private JCheckBox autoInsertParameters;
+    private JCheckBox showUnknownMethod;
 
     public LuaSettingsPanel() {
         settings = LuaSettings.Companion.getInstance();
@@ -67,6 +67,7 @@ public class LuaSettingsPanel implements SearchableConfigurable, Configurable.No
         smartCloseEnd.setSelected(settings.isSmartCloseEnd());
         showWordsInFile.setSelected(settings.isShowWordsInFile());
         autoInsertParameters.setSelected(settings.getAutoInsertParameters());
+        showUnknownMethod.setSelected(settings.isShowUnknownMethod());
         nilStrict.setSelected(settings.isNilStrict());
         unknownIndexable.setSelected(settings.isUnknownIndexable());
         unknownCallable.setSelected(settings.isUnknownCallable());
@@ -115,6 +116,7 @@ public class LuaSettingsPanel implements SearchableConfigurable, Configurable.No
                 settings.isSmartCloseEnd() != smartCloseEnd.isSelected() ||
                 settings.isShowWordsInFile() != showWordsInFile.isSelected() ||
                 settings.getAutoInsertParameters() != autoInsertParameters.isSelected() ||
+                settings.isShowUnknownMethod() != showUnknownMethod.isSelected() ||
                 settings.isNilStrict() != nilStrict.isSelected() ||
                 settings.isUnknownIndexable() != unknownIndexable.isSelected() ||
                 settings.isUnknownCallable() != unknownCallable.isSelected() ||
@@ -134,6 +136,7 @@ public class LuaSettingsPanel implements SearchableConfigurable, Configurable.No
         settings.setSmartCloseEnd(smartCloseEnd.isSelected());
         settings.setShowWordsInFile(showWordsInFile.isSelected());
         settings.setAutoInsertParameters(autoInsertParameters.isSelected());
+        settings.setShowUnknownMethod(showUnknownMethod.isSelected());
         settings.setNilStrict(nilStrict.isSelected());
         settings.setUnknownIndexable(unknownIndexable.isSelected());
         settings.setUnknownCallable(unknownCallable.isSelected());

@@ -26,6 +26,7 @@ import com.tang.intellij.lua.comment.psi.LuaDocTagField
 import com.tang.intellij.lua.comment.psi.LuaDocVisitor
 import com.tang.intellij.lua.lang.LuaIcons
 import com.tang.intellij.lua.psi.*
+import com.tang.intellij.lua.search.SearchContext
 
 
 private class LexicalContext(val element: LuaTreeElement? = null, val parent: LexicalContext? = null) {
@@ -104,6 +105,10 @@ class LuaStructureVisitor : LuaVisitor() {
             val expr = expressions?.getOrNull(i)
             val nameExpr = variableNames[i]
             val name = nameExpr.name ?: return
+            // 不处理参数赋值
+            if (nameExpr is LuaNameExpr && resolve(SearchContext.get(nameExpr.project), nameExpr) is LuaParamDef) {
+                return
+            }
 
             if (nameExpr is PsiNamedElement && findElementNamed(name) != null) {
                 // We're assigning to a previously declared entity -- ignore

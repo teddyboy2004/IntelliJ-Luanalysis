@@ -19,16 +19,18 @@ package com.tang.intellij.lua.codeInsight.template.macro
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInsight.template.*
-import com.intellij.codeInsight.template.impl.ConstantNode
 import com.intellij.codeInsight.template.impl.VariableNode
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import com.tang.intellij.lua.codeInsight.template.context.LuaFunContextType
-import com.tang.intellij.lua.psi.*
+import com.tang.intellij.lua.psi.LuaBlock
+import com.tang.intellij.lua.psi.LuaClassMethodName
+import com.tang.intellij.lua.psi.LuaFuncBodyOwner
+import com.tang.intellij.lua.psi.LuaIndexExpr
 
 class LuaFunctionParamSigMacro : Macro() {
-    override fun getPresentableName() = "LuaFunctionParamSignature(pre, post)"
+    override fun getPresentableName() = "LuaFunctionParamSignature(pre, post, removeSelf)"
 
     override fun getName() = "LuaFunctionParamSignature"
 
@@ -84,28 +86,33 @@ class LuaFunctionParamSigMacro : Macro() {
     }
 
     override fun calculateResult(expressions: Array<out Expression>, context: ExpressionContext?): Result? {
-        var (preStr, postStr) = getExpressionStringPair(expressions)
+        var (preStr, postStr, removeSelf) = getExpressionStringPair(expressions)
         var e = context?.psiElementAtStartOffset
         val isDot = checkLuaBlockIsDot(e)
         while (e != null && e !is PsiFile) {
             e = e.parent
             if (e is LuaFuncBodyOwner<*>) {
-                return TextResult(getParam(e, isDot, preStr, postStr))
+                return TextResult(getParam(e, isDot && !removeSelf, preStr, postStr))
             }
         }
         return null
     }
 
-    private fun getExpressionStringPair(expressions: Array<out Expression>): Pair<String, String> {
+    private fun getExpressionStringPair(expressions: Array<out Expression>): Triple<String, String, Boolean> {
         var preStr = ""
         var postStr = ""
+        var removeSelf = false
         if (expressions.isNotEmpty()) {
             preStr = expressions.first().calculateResult(null).toString()
             if (expressions.size > 1) {
                 postStr = expressions[1].calculateResult(null).toString()
             }
+            if (expressions.size > 2 && expressions[2] is VariableNode)
+            {
+                removeSelf = (expressions[2] as VariableNode).name == "true"
+            }
         }
-        return Pair(preStr, postStr)
+        return Triple(preStr, postStr, removeSelf)
     }
 
     override fun calculateLookupItems(params: Array<out Expression>, context: ExpressionContext?): Array<LookupElement>? {

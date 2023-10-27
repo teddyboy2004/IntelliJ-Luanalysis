@@ -17,10 +17,7 @@
 package com.tang.intellij.lua.documentation
 
 import com.intellij.codeInsight.documentation.DocumentationManagerUtil
-import com.intellij.openapi.editor.impl.EditorCssFontResolver
 import com.intellij.psi.PsiElement
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.psi.util.childrenOfType
 import com.tang.intellij.lua.comment.psi.*
 import com.tang.intellij.lua.comment.psi.api.LuaComment
 import com.tang.intellij.lua.search.ProjectSearchContext
@@ -249,7 +246,7 @@ fun renderDocParam(sb: StringBuilder, param: LuaDocTagParam, withinImplementatio
         if (paramTitle)
             sb.append("<b>param</b> ")
         sb.append("<code>${paramNameRef.text}</code>: ")
-        renderDocType(null, null, sb, param.ty, tyRenderer, if (withinImplementation && param.optional != null) Primitives.NIL else null)
+        renderDocType(null, null, sb, param.ty, tyRenderer, if (withinImplementation && param.optional != null) Primitives.NIL else null, paramTitle)
         renderCommentString(" - ", null, sb, param.commentString)
     }
 }
@@ -279,11 +276,11 @@ fun renderCommentString(prefix: String?, postfix: String?, sb: StringBuilder, ch
     }
 }
 
-private fun renderDocType(prefix: String?, postfix: String?, sb: StringBuilder, type: LuaDocType?, tyRenderer: ITyRenderer, mergeTy: ITy? = null) {
+private fun renderDocType(prefix: String?, postfix: String?, sb: StringBuilder, type: LuaDocType?, tyRenderer: ITyRenderer, mergeTy: ITy? = null, showStruct:Boolean = false) {
     if (type != null) {
         if (prefix != null) sb.append(prefix)
 
-        val ty = if (mergeTy != null) {
+        var ty = if (mergeTy != null) {
             type.getType().union(ProjectSearchContext(type.project), mergeTy)
         } else {
             type.getType()
@@ -294,7 +291,31 @@ private fun renderDocType(prefix: String?, postfix: String?, sb: StringBuilder, 
         if (parenthesesRequired) {
             sb.append('(')
         }
+        if (showStruct && ty is TyLazyClass) {
+            val context = SearchContext.get(type.project)
 
+            ty.lazyInit(context)
+            val aliasTy = ty.aliasTy
+            if (aliasTy != null)
+            {
+                sb.wrapTag("b") {
+                    sb.append(aliasTy.displayName)
+                }
+                ty = aliasTy.ty
+            }
+            else
+            {
+                val find = LuaClassIndex.find(context, ty.className)
+                if (find!= null)
+                {
+                    sb.wrapTag("b") {
+                        sb.append(ty.displayName)
+                    }
+                    ty = find.type
+                }
+            }
+
+        }
         renderTy(sb, ty, tyRenderer)
 
         if (parenthesesRequired) {
@@ -316,14 +337,12 @@ private fun renderTypeDef(sb: StringBuilder, tagType: LuaDocTagType, tyRenderer:
     if (ty is TyLazyClass)
     {
         ty.lazyInit(SearchContext.get(tagType.project))
-        if (ty.aliasTy != null) {
+        val aliasTy = ty.aliasTy
+        if (aliasTy != null) {
             sb.append("<pre style=\"font-family:'Microsoft YaHei'\">alias ")
-            sb.wrapTag("b") { tyRenderer.render((ty as TyLazyClass).aliasTy!!, sb) }
-            if (ty.aliasTy!=null)
-            {
-                sb.append(" ")
-                renderTy(sb, ty.aliasTy!!.ty, tyRenderer)
-            }
+            sb.wrapTag("b") { tyRenderer.render(aliasTy, sb) }
+            sb.append(" ")
+            renderTy(sb, aliasTy.ty, tyRenderer)
             sb.append("</pre>")
             renderCommentString(" - ", null, sb, tagType.commentString)
             return
