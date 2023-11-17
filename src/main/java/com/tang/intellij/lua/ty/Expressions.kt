@@ -327,10 +327,10 @@ private fun LuaCallExpr.infer(): ITy? {
 
     // require('module') resolution
     // TODO: Lazy module type like TyLazyClass, but with file paths for use when context.isDumb
-    if (!context.isDumb && expr is LuaNameExpr && LuaSettings.isRequireLikeFunctionName(expr.name)) {
+    if (expr is LuaNameExpr && LuaSettings.isRequireLikeFunctionName(expr.name)) {
         var stringValue = (luaCallExpr.firstStringArg as? LuaLiteralExpr)?.stringValue
         // 支持处理require(a.b)形式
-        if(stringValue == null) {
+        if(stringValue == null && !context.isDumb) {
             val args = luaCallExpr.args
             var psi: LuaPsiElement? = null
             when (args) {
@@ -350,16 +350,25 @@ private fun LuaCallExpr.infer(): ITy? {
                     val nameExpr = (psi as LuaIndexExpr).nameExpr
                     val infer = nameExpr?.infer(context)
                     if (infer is TyTable) {
-                        val text = (psi as LuaIndexExpr).id?.text
-                        if (text != null) {
-                            infer.psi.tableFieldList.forEach(){
-                                if (it.name == text) {
-                                    val guessType = it.guessType(context)
-                                    if (guessType is TyPrimitiveLiteral) {
-                                        stringValue = guessType.value
+                        val type = (psi as LuaIndexExpr).guessType(context)
+                        if (type is TyPrimitiveLiteral)
+                        {
+                            stringValue = type.value
+                            false
+                        }
+                        else
+                        {
+                            val text = (psi as LuaIndexExpr).id?.text
+                            if (text != null) {
+                                infer.psi.tableFieldList.forEach(){
+                                    if (it.name == text) {
+                                        val guessType = it.guessType(context)
+                                        if (guessType is TyPrimitiveLiteral) {
+                                            stringValue = guessType.value
+                                        }
                                     }
+                                    false
                                 }
-                                false
                             }
                         }
                     }
@@ -381,8 +390,6 @@ private fun LuaCallExpr.infer(): ITy? {
                         }
                     }
                 }
-
-
             }
         }
         if (stringValue!= null)

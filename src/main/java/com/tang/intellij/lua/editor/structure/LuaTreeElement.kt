@@ -23,9 +23,10 @@ import com.intellij.navigation.ItemPresentation
 import com.intellij.navigation.NavigationItem
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.TextAttributesKey
-import com.tang.intellij.lua.psi.LuaPsiElement
-import com.tang.intellij.lua.psi.LuaTableField
+import com.intellij.psi.util.PsiTreeUtil
+import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.ty.TyTable
 import com.tang.intellij.lua.ty.TypeMember
 import com.tang.intellij.lua.ty.guessParentClass
 import javax.swing.Icon
@@ -54,14 +55,28 @@ open class LuaTreeElement(val element: NavigationItem, var name: String, var ico
 
             override fun getLocationString(): String? {
                 if (this@LuaTreeElement.inherited) {
+                    var name: String? = null
                     val item = this@LuaTreeElement.element
-                    if (item is TypeMember)
-                    {
-                        return item.guessParentClass(SearchContext.get(item.psi.project))?.className
+                    if (item is TypeMember) {
+                        val context = SearchContext.get(item.psi.project)
+                        val clazz = item.guessParentClass(context)
+                        var className = clazz?.className
+                        if (clazz is TyTable)
+                        {
+                            val commentOwner = PsiTreeUtil.getParentOfType(clazz.psi, LuaCommentOwner::class.java)
+                            if (commentOwner?.comment?.tagClass?.name != null)
+                            {
+                                name = commentOwner.comment!!.tagClass?.name
+                            }
+                        }
+                        if (className != null&&!className.startsWith("table@")) {
+                            name = className.replace(Regex("#.*$"), "")
+                        }
                     }
-                    else if (item is LuaPsiElement) {
-                        return item.containingFile.name
+                    if (name == null && item is LuaPsiElement) {
+                        name = item.containingFile.name
                     }
+                    return name
                 }
                 return null
             }
@@ -71,8 +86,7 @@ open class LuaTreeElement(val element: NavigationItem, var name: String, var ico
             }
 
             override fun getTextAttributesKey(): TextAttributesKey? {
-                if (this@LuaTreeElement.inherited)
-                {
+                if (this@LuaTreeElement.inherited) {
                     return CodeInsightColors.NOT_USED_ELEMENT_ATTRIBUTES
                 }
                 return null

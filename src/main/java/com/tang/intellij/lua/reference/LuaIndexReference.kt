@@ -16,10 +16,14 @@
 
 package com.tang.intellij.lua.reference
 
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReferenceBase
+import com.intellij.refactoring.suggested.endOffset
+import com.intellij.refactoring.suggested.startOffset
 import com.intellij.util.IncorrectOperationException
+import com.tang.intellij.lua.EditorFactoryListener
 import com.tang.intellij.lua.psi.LuaElementFactory
 import com.tang.intellij.lua.psi.LuaIndexExpr
 import com.tang.intellij.lua.psi.resolve
@@ -29,9 +33,7 @@ import com.tang.intellij.lua.search.SearchContext
  *
  * Created by TangZX on 2016/12/4.
  */
-class LuaIndexReference internal constructor(element: LuaIndexExpr, private val id: PsiElement)
-    : PsiReferenceBase<LuaIndexExpr>(element), LuaReference {
-
+class LuaIndexReference internal constructor(element: LuaIndexExpr, private val id: PsiElement) : PsiReferenceBase<LuaIndexExpr>(element), LuaReference {
     override fun getRangeInElement(): TextRange {
         val start = id.node.startOffset - myElement.node.startOffset
         return TextRange(start, start + id.textLength)
@@ -57,6 +59,10 @@ class LuaIndexReference internal constructor(element: LuaIndexExpr, private val 
         if (ref != null) {
             if (ref.containingFile == myElement.containingFile) { //优化，不要去解析 Node Tree
                 if (ref.node.textRange == myElement.node.textRange) {
+                    val currentCaretOffset = EditorFactoryListener.CurrentCaretOffset
+                    if (myElement.containingFile.virtualFile == FileEditorManager.getInstance(myElement.project).selectedEditor?.file &&
+                        myElement.startOffset <= currentCaretOffset && myElement.endOffset >= currentCaretOffset
+                    )
                     return null//自己引用自己
                 }
             }
@@ -65,4 +71,5 @@ class LuaIndexReference internal constructor(element: LuaIndexExpr, private val 
     }
 
     override fun getVariants(): Array<Any> = emptyArray()
+
 }

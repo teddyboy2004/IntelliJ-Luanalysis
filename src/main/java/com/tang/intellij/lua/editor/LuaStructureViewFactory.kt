@@ -16,7 +16,6 @@
 
 package com.tang.intellij.lua.editor
 
-import com.intellij.execution.filters.FilterMixin.AdditionalHighlight
 import com.intellij.icons.AllIcons
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.structureView.*
@@ -25,10 +24,16 @@ import com.intellij.ide.util.treeView.smartTree.*
 import com.intellij.lang.PsiStructureViewFactory
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFile
-import com.tang.intellij.lua.comment.psi.LuaDocGeneralTy
 import com.tang.intellij.lua.comment.psi.LuaDocTagClass
 import com.tang.intellij.lua.editor.structure.*
+import com.tang.intellij.lua.psi.LuaClassMethodDefStat
 import com.tang.intellij.lua.psi.LuaPsiFile
+import com.tang.intellij.lua.psi.LuaPsiTypeGuessable
+import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.stubs.index.LuaClassMemberIndex
+import com.tang.intellij.lua.ty.ITy
+import com.tang.intellij.lua.ty.TyClass
+import com.tang.intellij.lua.ty.TypeGuessable
 
 
 /**
@@ -98,49 +103,68 @@ class LuaStructureViewFactory : PsiStructureViewFactory {
 
     inner class LuaInheritedMembersNodeProvider : InheritedMembersNodeProvider<TreeElement>() {
         override fun provideNodes(node: TreeElement): Collection<TreeElement> {
-            if (node is LuaClassElement) {
+            if (node is LuaVarElement && node.parent == null && node.children.isNotEmpty()) {
                 val inherited = mutableListOf<TreeElement>()
-                val containNames = hashSetOf<String>()
+                var type: ITy? = null
+                var context: SearchContext? = null
+                if (node.element is TypeGuessable) {
+                    context = SearchContext.get(node.element.psi.project)
+                    type = node.element.guessType(context)
+                }
+                else if (node.element is LuaDocTagClass)
+                {
+                    context = SearchContext.get(node.element.project)
+                    type = node.element.type
+                }
+                if (type is TyClass && context != null) {
+                    val containNames = hashSetOf<String>()
+                    addAllChildren(node, containNames)
+                    addInheritedMembers(type, containNames, inherited, context)
+                }
 
-                addInheritedMembers(node, containNames, inherited)
                 return inherited
             }
             return emptyList()
         }
 
-        private fun addInheritedMembers(
-            node: LuaClassElement?,
-            containNames: HashSet<String>,
-            inherited: MutableList<TreeElement>
-        ) {
-            if(node == null || node.element !is LuaDocTagClass)
-            {
+        private fun addAllChildren(node: LuaTreeElement, containNames: HashSet<String>) {
+            if (node.children.isEmpty()) {
                 return
             }
-            val clazz = node.element
-            val superClass = clazz.superClass
-            if (superClass is LuaDocGeneralTy) {
-                node.children.forEach { treeElement -> containNames.add((treeElement as LuaTreeElement).name) }
-                val psiElement = superClass.typeRef.reference.resolve()
-                if (psiElement != null && psiElement.containingFile is LuaPsiFile) {
-                    val element = LuaFileElement(psiElement.containingFile as LuaPsiFile)
-                    val find = element.children.find { treeElement -> (treeElement as LuaTreeElement).name == superClass.text }
-                    if (find is LuaClassElement)
-                    {
-                        find.children.forEach { treeElement ->
-                            val luaTreeElement = treeElement as LuaTreeElement
-                            val name = luaTreeElement.name
-                            if (containNames.add(name)) {
-                                luaTreeElement.inherited = true
-                                inherited.add(luaTreeElement)
-                            }
-                        }
-                        addInheritedMembers(find, containNames, inherited)
-                    }
-
-                }
+            node.children.forEach { treeElement ->
+                containNames.add((treeElement as LuaTreeElement).name)
+                addAllChildren(treeElement, containNames)
             }
         }
 
+        private fun addInheritedMembers(
+            clazz: TyClass,
+            containNames: HashSet<String>,
+            inherited: MutableList<TreeElement>,
+            context: SearchContext
+        ) {
+            val members = LuaClassMemberIndex.getMembers(context, clazz.className)
+
+            members.forEach { member ->
+                val memberName = member.name
+                if (memberName != null) {
+                    if (containNames.add(memberName)) {
+                        val item: LuaTreeElement
+                        if (member is LuaClassMethodDefStat) {
+                            item = LuaClassMethodElement(member, memberName, member.paramSignature, member.visibility)
+                        }
+                        else {
+                            item = LuaClassFieldElement(member, memberName)
+                        }
+                        item.inherited = true
+                        inherited.add(item)
+                    }
+                }
+            }
+            if (clazz.superClass is TyClass) {
+                addInheritedMembers(clazz.superClass as TyClass, containNames, inherited, context)
+            }
+        }
     }
+
 }

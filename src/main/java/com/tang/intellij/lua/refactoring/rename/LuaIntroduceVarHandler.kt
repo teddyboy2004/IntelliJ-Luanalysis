@@ -202,18 +202,15 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
             var element = operation.element
             val text = element.text
             var localDefStat: PsiElement
-            if (element is LuaCommentOwner && element.comment != null)
-            {
+            if (element is LuaCommentOwner && element.comment != null) {
                 val commentText = element.comment!!.text
                 var whiteSpace = ""
                 if (element.prevSibling is PsiWhiteSpace) {
                     whiteSpace = element.prevSibling.text
                 }
 
-                localDefStat = LuaElementFactory.createWith(operation.project,  commentText +"\n" + whiteSpace+ "local var = " + text.replace(commentText, ""))
-            }
-            else
-            {
+                localDefStat = LuaElementFactory.createWith(operation.project, commentText + "\n" + whiteSpace + "local var = " + text.replace(commentText, ""))
+            } else {
                 localDefStat = LuaElementFactory.createWith(operation.project, "local var = " + text)
             }
             var needSetPosition = true
@@ -294,7 +291,11 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
             if (position != null) {
                 var offset = position.endOffset
                 if (!operation.inline) {
-                    offset = (position.startOffset + myInsertedName.length)
+                    var len = 0
+                    if (myInsertedName != null) {
+                        len = myInsertedName.length
+                    }
+                    offset = (position.startOffset + len)
                 }
                 operation.editor.caretModel.moveToOffset(offset)
             }

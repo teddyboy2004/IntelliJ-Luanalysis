@@ -27,8 +27,8 @@
         <!--<<errorHandler implementation="com.tang.intellij.lua.errorreporting.GitHubErrorReporter"/>-->
 
         <applicationService serviceImplementation="com.tang.intellij.lua.psi.LuaFileManager"/>
-
         <projectService serviceImplementation="com.tang.intellij.lua.project.LuaSourceRootManager"/>
+        <editorFactoryListener implementation="com.tang.intellij.lua.EditorFactoryListener"/>
 
         <!--LuaCheck-->
         <toolWindow id="LuaCheck"
@@ -76,7 +76,7 @@
         <lang.findUsagesProvider language="Lua" implementationClass="com.tang.intellij.lua.usages.LuaFindUsagesProvider"/>
         <findUsagesHandlerFactory implementation="com.tang.intellij.lua.usages.LuaFindUsagesHandlerFactory"/>
         <usageTypeProvider implementation="com.tang.intellij.lua.usages.UsageTypeProvider"/>
-        <fileStructureGroupRuleProvider implementation="com.tang.intellij.lua.usages.UsageGroupingRuleProvider" />
+        <fileStructureGroupRuleProvider implementation="com.tang.intellij.lua.usages.UsageGroupingRuleProvider"/>
 
         <!--refactor-->
         <lang.refactoringSupport language="Lua" implementationClass="com.tang.intellij.lua.editor.LuaRefactoringSupportProvider"/>
