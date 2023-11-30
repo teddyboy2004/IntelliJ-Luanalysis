@@ -30,37 +30,37 @@ class TableCompletionProvider : ClassMemberCompletionProvider() {
 
     companion object {
         private val metaMethodNames = mapOf(
-                "__add" to "a + b",
-                "__sub" to "a - b",
-                "__mul" to "a * b",
-                "__div" to "a / b",
-                "__mod" to "a % b",
-                "__pow" to "a ^ b",
-                "__unm" to "-a",
-                "__concat" to "a .. b",
-                "__len" to "#a",
-                "__eq" to "a == a",
-                "__lt" to "a < b",
-                "__le" to "a <= b",
-                "__index" to "Meta method",
-                "__newindex" to "Meta method",
-                "__call" to "Meta method",
-                "__tostring" to "Meta method",
-                "__metatable" to "Meta method"
+            "__add" to "a + b",
+            "__sub" to "a - b",
+            "__mul" to "a * b",
+            "__div" to "a / b",
+            "__mod" to "a % b",
+            "__pow" to "a ^ b",
+            "__unm" to "-a",
+            "__concat" to "a .. b",
+            "__len" to "#a",
+            "__eq" to "a == a",
+            "__lt" to "a < b",
+            "__le" to "a <= b",
+            "__index" to "Meta method",
+            "__newindex" to "Meta method",
+            "__call" to "Meta method",
+            "__tostring" to "Meta method",
+            "__metatable" to "Meta method"
         )
     }
+
     override fun addCompletions(session: CompletionSession) {
         val completionParameters = session.parameters
         val completionResultSet = session.resultSet
         metaMethodNames.forEach {
             val b = LookupElementBuilder.create(it.key)
-                    .withTypeText(it.value)
-                    .withIcon(LuaIcons.META_METHOD)
+                .withTypeText(it.value)
+                .withIcon(LuaIcons.META_METHOD)
             completionResultSet.addElement(b)
         }
 
-        if (PsiTreeUtil.prevVisibleLeaf(completionParameters.position)?.text == "=")
-        {
+        if (PsiTreeUtil.prevVisibleLeaf(completionParameters.position)?.text == "=") {
             return
         }
 
@@ -68,27 +68,34 @@ class TableCompletionProvider : ClassMemberCompletionProvider() {
         if (table != null) {
             val project = table.project
             val prefixMatcher = completionResultSet.prefixMatcher
-            val ty = table.shouldBe(SearchContext.get(project))
-
-            if (ty == null) {
-                return
+            val context = SearchContext.get(project)
+            val ty = table.shouldBe(context) ?: return
+            // 记录一下已经有的成员，可以不提示
+            val set = HashSet<String>()
+            table.guessType(context)?.processMembers(context, false) { curType, member ->
+                if (member.name != null) {
+                    set.add(member.name!!)
+                }
+                true
             }
 
             ty.eachTopClass { luaType ->
-                val context = SearchContext.get(project)
                 luaType.processMembers(context) { curType, member ->
                     member.name?.let {
-                        if (prefixMatcher.prefixMatches(it)) {
+                        // 直接提示的情况下，显示所有末定义成员
+                        if (prefixMatcher.prefix == "" || prefixMatcher.prefixMatches(it)) {
                             val className = curType.displayName
                             if (member is LuaTypeField) {
-                                addField(completionResultSet, curType === luaType, className, it, member, null, object : HandlerProcessor() {
-                                    override fun process(element: LuaLookupElement, member: TypeMember, memberTy: ITy?): LookupElement {
-                                        element.itemText = element.itemText + " = "
-                                        element.lookupString = element.lookupString + " = "
+                                if (!set.contains(member.name)) {
+                                    addField(completionResultSet, curType === luaType, className, it, member, null, object : HandlerProcessor() {
+                                        override fun process(element: LuaLookupElement, member: TypeMember, memberTy: ITy?): LookupElement {
+                                            element.itemText += " = "
+                                            element.lookupString += " = "
 
-                                        return PrioritizedLookupElement.withPriority(element, 10.0)
-                                    }
-                                })
+                                            return PrioritizedLookupElement.withPriority(element, 10.0)
+                                        }
+                                    })
+                                }
                             }
                         }
                     }
