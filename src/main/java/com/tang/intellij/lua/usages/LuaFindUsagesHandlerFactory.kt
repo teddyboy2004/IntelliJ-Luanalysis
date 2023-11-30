@@ -68,6 +68,15 @@ class FindMethodUsagesHandler(val classMethod: LuaTypeMethod<*>) : FindUsagesHan
         //base declarations
         val methodName = classMethod.name
         var parentType = classMethod.guessParentType(ctx) as? ITyClass
+        // 如果本地有同名函数，就只查同名函数
+        if (parentType!=null && methodName!= null) {
+            val member = parentType.findMember(ctx, methodName)
+            if (member!=null && member!= classMethod)
+            {
+                arr.clear()
+                arr.add(member.psi)
+            }
+        }
         while (methodName != null && parentType != null) {
             val superClass = parentType.getSuperType(ctx) as? ITyClass
             val superMethod = superClass?.findMember(ctx, methodName)
@@ -76,6 +85,7 @@ class FindMethodUsagesHandler(val classMethod: LuaTypeMethod<*>) : FindUsagesHan
             }
             parentType = superClass
         }
+
         return arr.toTypedArray()
     }
 
