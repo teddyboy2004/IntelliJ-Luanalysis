@@ -22,9 +22,14 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.refactoring.suggested.endOffset
+import com.intellij.refactoring.suggested.startOffset
+import com.tang.intellij.lua.editor.completion.KeywordInsertHandler
 import com.tang.intellij.lua.lang.LuaFileType
-import com.tang.intellij.lua.psi.LuaFuncBody
-import com.tang.intellij.lua.psi.LuaTypes
+import com.tang.intellij.lua.psi.*
+import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.ty.TyUnknown
 
 /**
 
@@ -43,6 +48,22 @@ class LuaTypedHandler : TypedHandlerDelegate() {
                 when (element?.node?.elementType) {
                     LuaTypes.DOT,
                     LuaTypes.SHORT_COMMENT -> return TypedHandlerDelegate.Result.STOP
+
+                    LuaTypes.ID -> {
+                        if (element?.text == "self" && element.parent is LuaNameExpr && (element.parent as LuaNameExpr).guessType(SearchContext.get(project)) == null) {
+                            val type = PsiTreeUtil.getTopmostParentOfType(element, LuaClassMethodDefStat::class.java)
+                            if (type != null && type.classMethodName.dot != null) {
+                                val name = type.classMethodName.expression.name
+                                if (name != null) {
+                                    PsiDocumentManager.getInstance(project).commitDocument(editor.document)
+                                    editor.document.replaceString(element.startOffset, element.endOffset, name)
+                                    return TypedHandlerDelegate.Result.STOP
+                                }
+
+                            }
+//                            editor.document.replaceString(element.startOffset,)
+                        }
+                    }
                 }
             }
         }
@@ -57,7 +78,8 @@ class LuaTypedHandler : TypedHandlerDelegate() {
                 val pos = editor.caretModel.offset
                 val element = file.findElementAt(pos)
                 if (element != null && element.parent is LuaFuncBody) {
-                    editor.document.insertString(pos + 1, " end")
+                    editor.document.insertString(pos + 1, "\nend")
+                    KeywordInsertHandler.autoIndent(LuaTypes.END, file, project, editor.document, pos)
                     return TypedHandlerDelegate.Result.STOP
                 }
             }

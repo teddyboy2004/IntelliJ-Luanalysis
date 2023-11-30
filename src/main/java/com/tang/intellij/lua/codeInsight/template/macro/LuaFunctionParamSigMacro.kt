@@ -34,50 +34,43 @@ class LuaFunctionParamSigMacro : Macro() {
 
     override fun getName() = "LuaFunctionParamSignature"
 
-    private fun checkLuaBlockIsDot(e:PsiElement?):Boolean {
+    private fun checkLuaBlockIsDot(e: PsiElement?): Boolean {
         var isDot = false
         if (e?.parent is LuaBlock) {
             val block = e.parent
             val luaIndexExpr = PsiTreeUtil.findChildOfType(block, LuaIndexExpr::class.java)
-            if (luaIndexExpr!=null)
-            {
+            if (luaIndexExpr != null) {
                 isDot = luaIndexExpr.dot != null
             }
         }
         return isDot
     }
 
-    private fun getParam(e: LuaFuncBodyOwner<*>, isDot: Boolean, preStr: String, postStr: String):String
-    {
+    private fun getParam(e: LuaFuncBodyOwner<*>, isDot: Boolean, preStr: String, postStr: String): String {
         val str = e.paramSignature
         val methodName = PsiTreeUtil.getChildOfType(e, LuaClassMethodName::class.java)
-        var p  = str.substring(1, str.length-1)
-        if (p.isNotBlank() && (preStr.isNotBlank() || postStr.isNotBlank()))
-        {
+        var p = str.substring(1, str.length - 1)
+        if (p.isNotBlank() && (preStr.isNotBlank() || postStr.isNotBlank())) {
             val strings = p.split(",")
             val sb = StringBuilder()
             strings.forEach {
-                if (sb.isNotEmpty())
-                {
+                if (sb.isNotEmpty()) {
                     sb.append(", ")
                 }
                 if (preStr.isNotBlank()) {
                     sb.append(preStr)
                 }
                 sb.append(it.trim())
-                if (postStr.isNotBlank())
-                {
+                if (postStr.isNotBlank()) {
                     sb.append(postStr)
                 }
 
             }
             p = sb.toString()
         }
-        if (methodName != null && methodName.colon != null && isDot)
-        {
+        if (methodName != null && methodName.colon != null && isDot) {
             var sep = ""
-            if(p.isNotEmpty())
-            {
+            if (p.isNotEmpty()) {
                 sep = " ,"
             }
             p = "self$sep$p"
@@ -87,12 +80,13 @@ class LuaFunctionParamSigMacro : Macro() {
 
     override fun calculateResult(expressions: Array<out Expression>, context: ExpressionContext?): Result? {
         var (preStr, postStr, removeSelf) = getExpressionStringPair(expressions)
-        var e = context?.psiElementAtStartOffset
-        val isDot = checkLuaBlockIsDot(e)
-        while (e != null && e !is PsiFile) {
-            e = e.parent
-            if (e is LuaFuncBodyOwner<*>) {
-                return TextResult(getParam(e, isDot && !removeSelf, preStr, postStr))
+        if (context?.editor?.caretModel != null) {
+            var e = context?.psiElementAtStartOffset
+            while (e != null && e !is PsiFile) {
+                e = e.parent
+                if (e is LuaFuncBodyOwner<*>) {
+                    return TextResult(getParam(e, !removeSelf, preStr, postStr))
+                }
             }
         }
         return null
@@ -107,8 +101,7 @@ class LuaFunctionParamSigMacro : Macro() {
             if (expressions.size > 1) {
                 postStr = expressions[1].calculateResult(null).toString()
             }
-            if (expressions.size > 2 && expressions[2] is VariableNode)
-            {
+            if (expressions.size > 2 && expressions[2] is VariableNode) {
                 removeSelf = (expressions[2] as VariableNode).name == "true"
             }
         }

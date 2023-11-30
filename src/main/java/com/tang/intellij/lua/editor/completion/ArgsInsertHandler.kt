@@ -84,8 +84,8 @@ abstract class ArgsInsertHandler : InsertHandler<LookupElement> {
                 }
             }
 
-            // 增加判断函数是否使用:，并且前面使用点自动更换成:
-            if (lookupElement.psiElement is LuaClassMethodDefStat && (lookupElement.psiElement as LuaClassMethodDefStat).classMethodName.colon != null)
+            // 增加判断函数是否使用:，并且前面使用点自动更换成:, 回车不替换
+            if (insertionContext.completionChar != '\n' && lookupElement.psiElement is LuaClassMethodDefStat && (lookupElement.psiElement as LuaClassMethodDefStat).classMethodName.colon != null)
             {
                 val isSuperCall = element.prevSibling?.prevLeaf()?.text == "__super"
                 val preElementType = element.prevSibling?.elementType

@@ -77,6 +77,7 @@
         <findUsagesHandlerFactory implementation="com.tang.intellij.lua.usages.LuaFindUsagesHandlerFactory"/>
         <usageTypeProvider implementation="com.tang.intellij.lua.usages.UsageTypeProvider"/>
         <fileStructureGroupRuleProvider implementation="com.tang.intellij.lua.usages.UsageGroupingRuleProvider"/>
+        <usageFilteringRuleProvider implementation="com.tang.intellij.lua.usages.LuaUsageFilteringRuleProvider"/>
 
         <!--refactor-->
         <lang.refactoringSupport language="Lua" implementationClass="com.tang.intellij.lua.editor.LuaRefactoringSupportProvider"/>
@@ -436,6 +437,8 @@
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
+
+        <action class="com.intellij.openapi.actionSystem.EmptyAction" text="Lua Method Override" icon="AllIcons.General.OverridenMethod" id="UsageFiltering.LuaOverride"/>
     </actions>
 
     <extensionPoints>

@@ -947,6 +947,18 @@ class TyLazySubstitutedTable(context: SearchContext, table: TyTable, val substit
         superClass = table
     }
 
+    override fun getSuperType(context: SearchContext): ITy? {
+        if (superClass is TyTable)
+        {
+            // 避免table显示错误override图标
+            if ((superClass as TyTable).psi == psi)
+            {
+                superClass = (superClass as TyTable).getSuperType(context)
+            }
+        }
+        return super.getSuperType(context)
+    }
+
     override fun getMemberSubstitutor(context: SearchContext): ITySubstitutor? {
         return TyChainSubstitutor.chain(super.getMemberSubstitutor(context), substitutor)
     }
