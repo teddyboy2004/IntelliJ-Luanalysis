@@ -155,9 +155,18 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
             }
             // 显示未知调用
             if (LuaSettings.instance.isShowUnknownMethod) {
-                val luaExpression = indexExpr.expressionList.last() as LuaNameExpr
-                if (luaExpression.isGlobal()) {
-                    var prefix = luaExpression.name ?: ""
+                var show: Boolean
+
+                val last = indexExpr.expressionList.last()
+                if (last is LuaNameExpr) {
+                    show = last.isGlobal()
+                }
+                else {
+                    val resolvedPrefixTy = Ty.resolve(context, prefixType)
+                    show = resolvedPrefixTy is TyUnknown
+                }
+                if (show) {
+                    var prefix = last.name ?: ""
                     if (prefix.isNotBlank()) {
                         prefix = prefix.replace(Regex("_.*"), "")
                         val allKeys = LuaUnknownClassMemberIndex.instance.getAllKeys(context.project)
@@ -243,7 +252,6 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
 
                 }
             }
-            true
         }
 
         memberNameTypes.forEach() { name, type ->
@@ -258,8 +266,6 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
                 completionMode,
                 handlerProcessor
             )
-
-            true
         }
 
 //        val globalChildTys = unionTy.getChildTypes().filter { it.isGlobal }
