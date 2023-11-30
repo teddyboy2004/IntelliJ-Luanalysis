@@ -216,10 +216,21 @@ fun resolve(context: SearchContext, indexExpr: LuaIndexExpr, memberName: String)
         }
     }
 
-    type.eachTopClass { ty ->
-        val cls = (if (ty is ITyGeneric) ty.base else ty) as? ITyClass
-        ret = cls?.findMember(context, memberName)?.psi
-        ret == null
+    // 支持跳转alias
+    if (type is TyClass && type.aliasTy != null)
+    {
+        val member = type.aliasTy!!.findMember(context, memberName)
+        if (member != null) {
+            ret = member.psi
+        }
+    }
+
+    if (ret == null) {
+        type.eachTopClass { ty ->
+            val cls = (if (ty is ITyGeneric) ty.base else ty) as? ITyClass
+            ret = cls?.findMember(context, memberName)?.psi
+            ret == null
+        }
     }
 
     if (ret == null) {

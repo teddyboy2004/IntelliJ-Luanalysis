@@ -24,7 +24,7 @@ import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.stubs.index.LuaAliasIndex
 import com.tang.intellij.lua.stubs.index.LuaClassIndex
 import com.tang.intellij.lua.ty.IPsiTy
-import com.tang.intellij.lua.ty.TyAlias
+import com.tang.intellij.lua.ty.TyArray
 import com.tang.intellij.lua.ty.TyClass
 import com.tang.intellij.lua.ty.TyTable
 
@@ -37,7 +37,11 @@ class LuaTypeDeclarationProvider : TypeDeclarationPlaceAwareProvider {
         if (p0 is LuaPsiTypeGuessable) {
             val project = p0.project
             val context = SearchContext.get(project)
-            val type = p0.guessType(context)
+            var type = p0.guessType(context)
+            if (type is TyArray)
+            {
+                type = type.base
+            }
             if (type is TyTable)
             {
                 return arrayOf(type.psi)

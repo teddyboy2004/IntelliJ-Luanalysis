@@ -21,12 +21,13 @@ import com.intellij.patterns.PlatformPatterns.psiElement
 import com.intellij.psi.*
 import com.intellij.util.IncorrectOperationException
 import com.intellij.util.ProcessingContext
-import com.intellij.util.applyIf
+import com.tang.intellij.lua.comment.psi.LuaDocTagAlias
+import com.tang.intellij.lua.comment.psi.LuaDocTagClass
 import com.tang.intellij.lua.project.LuaSettings
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.search.SearchContext
+import com.tang.intellij.lua.stubs.index.LuaShortNameIndex
 import com.tang.intellij.lua.ty.returnStatement
-import org.jaxen.expr.LiteralExpr
 
 /**
  * reference contributor
@@ -38,13 +39,12 @@ class LuaReferenceContributor : PsiReferenceContributor() {
         psiReferenceRegistrar.registerReferenceProvider(psiElement().withElementType(LuaTypes.INDEX_EXPR), IndexExprReferenceProvider())
         psiReferenceRegistrar.registerReferenceProvider(psiElement().withElementType(LuaTypes.NAME_EXPR), NameReferenceProvider())
         psiReferenceRegistrar.registerReferenceProvider(psiElement().withElementType(LuaTypes.GOTO_STAT), GotoReferenceProvider())
-        psiReferenceRegistrar.registerReferenceProvider(psiElement().withElementType(LuaTypes.LITERAL_EXPR), LuaFileStringReferenceProvider())
+        psiReferenceRegistrar.registerReferenceProvider(psiElement().withElementType(LuaTypes.LITERAL_EXPR), LuaStringReferenceProvider())
     }
 
-    internal inner class LuaFileStringReferenceProvider : PsiReferenceProvider() {
+    internal inner class LuaStringReferenceProvider : PsiReferenceProvider() {
 
-        inner class LuaFileStringReference(val expr: LuaLiteralExpr)
-            : PsiReferenceBase<LuaLiteralExpr>(expr) {
+        inner class LuaFileStringReference(val expr: LuaLiteralExpr) : PsiReferenceBase<LuaLiteralExpr>(expr) {
 
             val id = expr.psi
 
@@ -65,27 +65,40 @@ class LuaReferenceContributor : PsiReferenceContributor() {
             }
 
             override fun resolve(): PsiElement? {
-                val filePsi = resolveRequireFile(id.text.replace("\"",""), id.project)
-                if (filePsi != null) {
-                    val returnStatement = filePsi.returnStatement()
+                val text = id.text.replace("\"", "")
+                if (text.contains(".") || text.contains("/")) {
+                    val filePsi = resolveRequireFile(text, id.project)
+                    if (filePsi != null) {
+                        val returnStatement = filePsi.returnStatement()
 
-                    if (returnStatement != null && returnStatement.exprList?.expressionList?.size == 1) {
-                        val resolvedNameExpr = returnStatement.exprList!!.expressionList.first() as? LuaNameExpr
+                        if (returnStatement != null && returnStatement.exprList?.expressionList?.size == 1) {
+                            val resolvedNameExpr = returnStatement.exprList!!.expressionList.first() as? LuaNameExpr
 
-                        return if (resolvedNameExpr != null) {
-                            resolveInFile(SearchContext.get(myElement.project), resolvedNameExpr.name, resolvedNameExpr)
-                        } else returnStatement
+                            return if (resolvedNameExpr != null) {
+                                resolveInFile(SearchContext.get(myElement.project), resolvedNameExpr.name, resolvedNameExpr)
+                            } else returnStatement
+                        }
+                        if (returnStatement != null) {
+                            return returnStatement
+                        }
                     }
-                    if (returnStatement != null) {
-                        return returnStatement
+                    return filePsi
+                }
+                else
+                {
+                    val find = LuaShortNameIndex.find(SearchContext.get(id.project), text)
+                    if (find.isNotEmpty()) {
+                        val first = find.first()
+                        if (first is LuaDocTagClass || first is LuaDocTagAlias)
+                            return first
                     }
                 }
-                return filePsi
+                return null
             }
         }
 
         override fun getReferencesByElement(psiElement: PsiElement, processingContext: ProcessingContext): Array<PsiReference> {
-            if (psiElement is LuaLiteralExpr && psiElement.text != null && psiElement.text.contains(Regex("[.\\\\]"))) {
+            if (psiElement is LuaLiteralExpr && psiElement.text != null) {
                 return arrayOf(LuaFileStringReference(psiElement))
             }
             return PsiReference.EMPTY_ARRAY

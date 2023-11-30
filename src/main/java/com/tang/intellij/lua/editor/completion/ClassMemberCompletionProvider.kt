@@ -23,6 +23,7 @@ import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.psi.PsiFile
 import com.intellij.psi.TokenType
 import com.intellij.psi.util.PsiTreeUtil
+import com.tang.intellij.lua.Constants
 import com.tang.intellij.lua.lang.LuaIcons
 import com.tang.intellij.lua.project.LuaSettings
 import com.tang.intellij.lua.psi.*
@@ -123,40 +124,6 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
             val contextTy = LuaPsiTreeUtil.findContextClass(context, indexExpr)
             val prefixType = indexExpr.guessParentType(context)
             if (!Ty.isInvalid(prefixType)) {
-                // 显示未知调用
-                if (LuaSettings.instance.isShowUnknownMethod) {
-                    val resolvedPrefixTy = Ty.resolve(context, prefixType)
-                    if (resolvedPrefixTy is TyUnknown) {
-                        val luaExpression = indexExpr.expressionList.last()
-                        var prefix = luaExpression.name ?: ""
-                        if (prefix.isNotBlank()) {
-                            prefix = prefix.replace(Regex("_.*"), "")
-                            val allKeys = LuaUnknownClassMemberIndex.instance.getAllKeys(context.project)
-                            val allKeySet = HashSet<String>()
-                            var matchKeySet = HashSet<String>()
-                            allKeys.forEach { name ->
-                                if (name != null) {
-                                    var strings = name.split("*")
-                                    if (strings.size == 2) {
-                                        if (strings[0] == prefix) {
-                                            matchKeySet.add(strings[1])
-                                        }
-                                        allKeySet.add(strings[1])
-                                    }
-                                }
-                            }
-                            matchKeySet.forEach() {
-                                completionResultSet.addElement(
-                                    LookupElementBuilder.create(it)
-                                        .withIcon(LuaIcons.CLASS_METHOD)
-                                        .withInsertHandler(OverrideInsertHandler())
-                                        .withTypeText("$prefix?", true)
-                                )
-                            }
-                            return
-                        }
-                    }
-                }
                 complete(context, isColon, contextTy, prefixType, completionResultSet, completionResultSet.prefixMatcher, null)
             }
             //smart
@@ -185,6 +152,38 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
                         }
                     }
                     true
+                }
+            }
+            // 显示未知调用
+            if (LuaSettings.instance.isShowUnknownMethod) {
+                val luaExpression = indexExpr.expressionList.last() as LuaNameExpr
+                if (luaExpression.isGlobal()) {
+                    var prefix = luaExpression.name ?: ""
+                    if (prefix.isNotBlank()) {
+                        prefix = prefix.replace(Regex("_.*"), "")
+                        val allKeys = LuaUnknownClassMemberIndex.instance.getAllKeys(context.project)
+                        val allKeySet = HashSet<String>()
+                        var matchKeySet = HashSet<String>()
+                        allKeys.forEach { name ->
+                            if (name != null) {
+                                var strings = name.split("*")
+                                if (strings.size == 2) {
+                                    if (strings[0] == prefix) {
+                                        matchKeySet.add(strings[1])
+                                    }
+                                    allKeySet.add(strings[1])
+                                }
+                            }
+                        }
+                        matchKeySet.forEach() {
+                            completionResultSet.addElement(
+                                LookupElementBuilder.create(it)
+                                    .withIcon(LuaIcons.CLASS_METHOD)
+                                    .withInsertHandler(OverrideInsertHandler())
+                                    .withTypeText("$prefix?", true)
+                            )
+                        }
+                    }
                 }
             }
         }

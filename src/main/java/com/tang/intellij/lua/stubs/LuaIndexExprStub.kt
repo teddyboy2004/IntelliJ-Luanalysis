@@ -27,6 +27,7 @@ import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.psi.impl.LuaIndexExprImpl
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.stubs.index.LuaClassMemberIndex
+import com.tang.intellij.lua.stubs.index.LuaShortNameIndex
 import com.tang.intellij.lua.stubs.index.StubKeys
 import com.tang.intellij.lua.ty.*
 
@@ -161,12 +162,14 @@ class LuaIndexExprType : LuaStubElementType<LuaIndexExprStub, LuaIndexExpr>("IND
                 } else if (element is LuaIndexExprStub) {
                     callName = element.name
                 }
-                if (callName != null) {
+
+                if (callName != null)
+                {
                     callName = callName.replace(Regex("_.*"), "")
                 }
             }
-            if (callName!= "self")
-            {
+            // 太少的名字没有太多意义，循环中的v，k等
+            if (callName != null && callName != "self" && callName.length > 2) {
                 val s = "$callName*$fieldName"
                 indexSink.occurrence(StubKeys.UNKNOWN_MEMBER, s)
             }

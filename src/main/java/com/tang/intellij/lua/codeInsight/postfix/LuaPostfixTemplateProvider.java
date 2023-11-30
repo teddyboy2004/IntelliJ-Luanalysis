@@ -22,6 +22,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.tang.intellij.lua.codeInsight.postfix.templates.*;
+import com.tang.intellij.lua.codeInsight.postfix.templates.LuaNotPostfixTemplate;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Set;
@@ -50,7 +51,8 @@ public class LuaPostfixTemplateProvider implements PostfixTemplateProvider {
                 new LuaDecreasePostfixTemplate(),
                 new LuaParPostfixTemplate(),
                 new LuaToNumberPostfixTemplate(),
-                new LuaToStringPostfixTemplate()
+                new LuaToStringPostfixTemplate(),
+                new LuaNotPostfixTemplate()
         );
     }
 

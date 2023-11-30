@@ -51,6 +51,7 @@ class LuaTypedHandler : TypedHandlerDelegate() {
 
                     LuaTypes.ID -> {
                         if (element?.text == "self" && element.parent is LuaNameExpr && (element.parent as LuaNameExpr).guessType(SearchContext.get(project)) == null) {
+                            // 函数里处理替换
                             val type = PsiTreeUtil.getTopmostParentOfType(element, LuaClassMethodDefStat::class.java)
                             if (type != null && type.classMethodName.dot != null) {
                                 val name = type.classMethodName.expression.name
@@ -59,9 +60,28 @@ class LuaTypedHandler : TypedHandlerDelegate() {
                                     editor.document.replaceString(element.startOffset, element.endOffset, name)
                                     return TypedHandlerDelegate.Result.STOP
                                 }
-
                             }
-//                            editor.document.replaceString(element.startOffset,)
+                            // 函数外处理替换
+
+                            // 查找函数定义
+                            var typeName:String? = null
+                            val declaration = PsiTreeUtil.getChildOfType(element.containingFile, LuaClassMethodDefStat::class.java)
+                            if (declaration != null) {
+                                typeName = declaration.classMethodName.nameExpr?.text
+                            }
+
+                            if (typeName != null) {
+                                val defStat = PsiTreeUtil.getChildOfType(element.containingFile, LuaLocalDefStat::class.java)
+                                if (defStat != null)
+                                {
+                                    typeName = defStat.localDefList.first().name
+                                }
+                            }
+                            if (typeName != null) {
+                                PsiDocumentManager.getInstance(project).commitDocument(editor.document)
+                                editor.document.replaceString(element.startOffset, element.endOffset, typeName)
+                                return TypedHandlerDelegate.Result.STOP
+                            }
                         }
                     }
                 }
