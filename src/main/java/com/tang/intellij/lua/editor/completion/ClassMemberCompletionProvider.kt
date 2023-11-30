@@ -23,7 +23,6 @@ import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.psi.PsiFile
 import com.intellij.psi.TokenType
 import com.intellij.psi.util.PsiTreeUtil
-import com.tang.intellij.lua.Constants
 import com.tang.intellij.lua.lang.LuaIcons
 import com.tang.intellij.lua.project.LuaSettings
 import com.tang.intellij.lua.psi.*
