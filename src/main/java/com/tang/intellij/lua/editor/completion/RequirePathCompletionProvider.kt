@@ -22,6 +22,7 @@ import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.refactoring.suggested.startOffset
 import com.tang.intellij.lua.lang.LuaFileType
 import com.tang.intellij.lua.lang.LuaIcons
 import com.tang.intellij.lua.lang.type.LuaString
@@ -81,8 +82,14 @@ class RequirePathCompletionProvider : LuaCompletionProvider() {
 
         override fun handleInsert(insertionContext: InsertionContext, lookupElement: LookupElement) {
             val tailOffset = insertionContext.tailOffset
-            val cur = insertionContext.file.findElementAt(tailOffset)
-
+            var cur = insertionContext.file.findElementAt(tailOffset)
+            val itemStrLen = lookupElement.lookupString.length
+            if (cur != null && !cur.text.equals("\"" + lookupElement.lookupString + "\"") && cur.textLength != itemStrLen) {
+                insertionContext.document.insertString(cur.startOffset + itemStrLen + 1, "\"")
+                return
+//                insertionContext.commitDocument()
+//                cur = insertionContext.file.findElementAt(tailOffset)
+            }
             if (cur != null) {
                 val start = cur.textOffset
 

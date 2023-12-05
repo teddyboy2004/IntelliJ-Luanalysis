@@ -163,7 +163,7 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
                 }
                 else {
                     val resolvedPrefixTy = Ty.resolve(context, prefixType)
-                    show = resolvedPrefixTy is TyUnknown
+                    show = resolvedPrefixTy is TyUnknown || resolvedPrefixTy is TyNil
                 }
                 if (show) {
                     var prefix = last.name ?: ""

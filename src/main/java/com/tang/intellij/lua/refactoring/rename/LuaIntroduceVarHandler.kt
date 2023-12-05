@@ -36,9 +36,11 @@ import com.intellij.refactoring.introduce.inplace.OccurrencesChooser
 import com.intellij.refactoring.introduce.inplace.OccurrencesChooser.BaseReplaceChoice
 import com.intellij.refactoring.introduce.inplace.OccurrencesChooser.ReplaceChoice
 import com.intellij.refactoring.suggested.endOffset
+import com.tang.intellij.lua.codeInsight.template.macro.SuggestFirstLuaVarNameMacro
 import com.tang.intellij.lua.lang.LuaLanguage
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
+import java.util.LinkedHashSet
 
 
 /**
@@ -198,20 +200,26 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
             operation.occurrences = listOf(operation.element)
 
         var commonParent = PsiTreeUtil.findCommonParent(operation.occurrences)
+        var element = operation.element
+        var varName = SuggestFirstLuaVarNameMacro.getElementSuggestName(PsiTreeUtil.getDeepestLast(element), element)
+        if (varName == null)
+        {
+            varName = "var"
+        }
+        operation.name = varName
         if (commonParent != null) {
-            var element = operation.element
             val text = element.text
             var localDefStat: PsiElement
+
             if (element is LuaCommentOwner && element.comment != null) {
                 val commentText = element.comment!!.text
                 var whiteSpace = ""
                 if (element.prevSibling is PsiWhiteSpace) {
                     whiteSpace = element.prevSibling.text
                 }
-
-                localDefStat = LuaElementFactory.createWith(operation.project, commentText + "\n" + whiteSpace + "local var = " + text.replace(commentText, ""))
+                localDefStat = LuaElementFactory.createWith(operation.project, commentText + "\n" + whiteSpace + "local " + varName + " = " + text.replace(commentText, ""))
             } else {
-                localDefStat = LuaElementFactory.createWith(operation.project, "local var = " + text)
+                localDefStat = LuaElementFactory.createWith(operation.project, "local " + varName + " = " + text)
             }
             var needSetPosition = true
             val inline = isInline(commonParent, operation)
@@ -302,4 +310,8 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
             super.moveOffsetAfter(success)
         }
     }
+}
+
+private fun SuggestFirstLuaVarNameMacro.Companion.getElementSuggestName(element: PsiElement) {
+
 }
