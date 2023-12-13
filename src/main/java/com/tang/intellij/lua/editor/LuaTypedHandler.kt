@@ -70,7 +70,7 @@ class LuaTypedHandler : TypedHandlerDelegate() {
                                 typeName = declaration.classMethodName.nameExpr?.text
                             }
 
-                            if (typeName != null) {
+                            if (typeName == null) {
                                 val defStat = PsiTreeUtil.getChildOfType(element.containingFile, LuaLocalDefStat::class.java)
                                 if (defStat != null)
                                 {

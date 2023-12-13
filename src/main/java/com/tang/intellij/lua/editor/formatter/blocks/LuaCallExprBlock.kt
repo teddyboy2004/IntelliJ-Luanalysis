@@ -17,6 +17,7 @@
 package com.tang.intellij.lua.editor.formatter.blocks
 
 import com.intellij.formatting.*
+import com.intellij.psi.PsiComment
 import com.tang.intellij.lua.editor.formatter.LuaFormatContext
 import com.tang.intellij.lua.psi.LuaCallExpr
 import com.tang.intellij.lua.psi.LuaTypes
@@ -25,12 +26,17 @@ class LuaCallExprBlock(psi: LuaCallExpr, wrap: Wrap?, alignment: Alignment?, ind
     : LuaScriptBlock(psi, wrap, alignment, indent, ctx) {
 
     override fun getSpacing(child1: Block?, child2: Block): Spacing? {
+        // 处理错误的注释导致的格式化错误
+        var keepLineBreaks = false
+        if (child1 is LuaScriptBlock &&  child1.psi is PsiComment) {
+            keepLineBreaks = true
+        }
         if (child1 is LuaScriptBlock && child2 is LuaScriptBlock) {
             // call(param)
             return if (child2.node.findChildByType(LuaTypes.LPAREN) != null) {
-                Spacing.createSpacing(0, 0, 0, false, 0)
+                Spacing.createSpacing(0, 0, 0, keepLineBreaks, 0)
             } else {
-                Spacing.createSpacing(1, 1, 0, false, 0)
+                Spacing.createSpacing(1, 1, 0, keepLineBreaks, 0)
             }// call "string"
         }
         return super.getSpacing(child1, child2)

@@ -109,13 +109,15 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
 
     }
 
+    val classMemberSet = HashSet<String>()
+
     override fun addCompletions(session: CompletionSession) {
         val completionParameters = session.parameters
         val completionResultSet = session.resultSet
 
         val psi = completionParameters.position
         val indexExpr = psi.parent
-
+        classMemberSet.clear()
         if (indexExpr is LuaIndexExpr) {
             val isColon = indexExpr.colon != null
             val project = indexExpr.project
@@ -145,7 +147,7 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
                                 override fun process(element: LuaLookupElement, member: TypeMember, memberTy: ITy?): LookupElement {
                                     element.itemText = txt + colon + element.itemText
                                     element.lookupString = txt + colon + element.lookupString
-                                    return PrioritizedLookupElement.withPriority(element, -2.0)
+                                    return PrioritizedLookupElement.withPriority(element, -0.3)
                                 }
                             })
                         }
@@ -155,27 +157,31 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
             }
             // 显示未知调用
             if (LuaSettings.instance.isShowUnknownMethod) {
-                var show: Boolean
+                var show: Boolean = true
 
                 val last = indexExpr.expressionList.last()
-                if (last is LuaNameExpr) {
-                    show = last.isGlobal()
-                }
-                else {
-                    val resolvedPrefixTy = Ty.resolve(context, prefixType)
-                    show = resolvedPrefixTy is TyUnknown || resolvedPrefixTy is TyNil
-                }
+//                if (last is LuaNameExpr) {
+//                    show = last.isGlobal()
+//                }
+//                if(!show)
+//                {
+//                    val resolvedPrefixTy = Ty.resolve(context, prefixType)
+//                    show = resolvedPrefixTy is TyUnknown || resolvedPrefixTy is TyNil || resolvedPrefixTy is TyGenericParameter
+//                }
                 if (show) {
                     var prefix = last.name ?: ""
                     if (prefix.isNotBlank()) {
                         prefix = prefix.replace(Regex("_.*"), "")
                         val allKeys = LuaUnknownClassMemberIndex.instance.getAllKeys(context.project)
                         val allKeySet = HashSet<String>()
-                        var matchKeySet = HashSet<String>()
+                        val matchKeySet = HashSet<String>()
                         allKeys.forEach { name ->
                             if (name != null) {
                                 var strings = name.split("*")
                                 if (strings.size == 2) {
+                                    if (classMemberSet.contains(strings[1])){
+                                        return@forEach
+                                    }
                                     if (strings[0] == prefix) {
                                         matchKeySet.add(strings[1])
                                     }
@@ -184,11 +190,12 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
                             }
                         }
                         matchKeySet.forEach() {
+                            var item = LookupElementBuilder.create(it)
+                                .withIcon(LuaIcons.CLASS_METHOD)
+                                .withInsertHandler(OverrideInsertHandler())
+                                .withTypeText("$prefix?", true)
                             completionResultSet.addElement(
-                                LookupElementBuilder.create(it)
-                                    .withIcon(LuaIcons.CLASS_METHOD)
-                                    .withInsertHandler(OverrideInsertHandler())
-                                    .withTypeText("$prefix?", true)
+                                PrioritizedLookupElement.withPriority(item, -0.5)
                             )
                         }
                     }
@@ -407,6 +414,7 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
     ) {
         val element = LookupElementFactory.createFieldLookupElement(clazzName, fieldName, field, ty, bold)
         val ele = handlerProcessor?.process(element, field, null) ?: element
+        classMemberSet.add(fieldName)
         completionResultSet.addElement(ele)
     }
 
@@ -434,7 +442,6 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
                 }
 
                 val lookupString = handlerProcessor?.processLookupString(name, classMember, ty) ?: name
-
                 val element = LookupElementFactory.createMethodLookupElement(
                     clazzName,
                     lookupString,
@@ -446,6 +453,7 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
                     LuaIcons.CLASS_METHOD
                 )
                 val ele = handlerProcessor?.process(element, classMember, ty) ?: element
+                classMemberSet.add(name)
                 completionResultSet.addElement(ele)
                 true
             }

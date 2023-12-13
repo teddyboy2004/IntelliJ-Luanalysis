@@ -21,26 +21,22 @@ import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.Pass
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiWhiteSpace
+import com.intellij.openapi.util.TextRange
+import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.elementsAroundOffsetUp
 import com.intellij.refactoring.IntroduceTargetChooser
 import com.intellij.refactoring.RefactoringActionHandler
-import com.intellij.refactoring.RefactoringBundle
 import com.intellij.refactoring.introduce.inplace.InplaceVariableIntroducer
 import com.intellij.refactoring.introduce.inplace.OccurrencesChooser
-import com.intellij.refactoring.introduce.inplace.OccurrencesChooser.BaseReplaceChoice
 import com.intellij.refactoring.introduce.inplace.OccurrencesChooser.ReplaceChoice
 import com.intellij.refactoring.suggested.endOffset
 import com.tang.intellij.lua.codeInsight.template.macro.SuggestFirstLuaVarNameMacro
 import com.tang.intellij.lua.lang.LuaLanguage
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
-import java.util.LinkedHashSet
 
 
 /**
@@ -62,7 +58,9 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
         var newNameElement: LuaLocalDef? = null
         var position: PsiElement? = null
         var inline: Boolean = false
+        var suggestedName: String? = null
     }
+
 
     override fun invoke(project: Project, editor: Editor, psiFile: PsiFile, dataContext: DataContext) {
         val selectionModel = editor.getSelectionModel();
@@ -158,13 +156,31 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
         }
 
         val operation = IntroduceOperation(expression, project, editor, expression.containingFile, occurrences!!)
-        OccurrencesChooser.simpleChooser<PsiElement>(editor).showChooser(expression, occurrences, object : Pass<ReplaceChoice>() {
+        val occurrencesMap = LinkedHashMap<ReplaceChoice, List<PsiElement>>()
+        occurrencesMap[ReplaceChoice.NO] = listOf<PsiElement>(expression)
+        if (occurrences.size > 1) {
+            val filterWrite = occurrences.filter { psiElement -> psiElement.parent !is LuaVarList }
+            if (filterWrite.isNotEmpty() && filterWrite.size != occurrences.size) {
+                occurrencesMap[ReplaceChoice.NO_WRITE] = filterWrite
+            }
+            occurrencesMap[ReplaceChoice.ALL] = occurrences
+        }
+        val callback = object : Pass<ReplaceChoice>() {
             override fun pass(choice: ReplaceChoice) {
-                operation.isReplaceAll = choice == ReplaceChoice.ALL
+                operation.isReplaceAll = choice != ReplaceChoice.NO
+                if (occurrencesMap[choice] != null) {
+                    operation.occurrences = occurrencesMap[choice]!!
+                }
                 WriteCommandAction.runWriteCommandAction(operation.project) { performReplace(operation) }
                 performInplaceIntroduce(operation)
             }
-        })
+        }
+//        OccurrencesChooser.simpleChooser<PsiElement>(editor).showChooser(expression, occurrences, callback)
+        if (occurrences.size == 1) {
+            callback.pass(ReplaceChoice.ALL)
+        } else {
+            OccurrencesChooser.simpleChooser<PsiElement>(editor).showChooser(callback, occurrencesMap)
+        }
     }
 
     private fun getOccurrences(expression: LuaExpression<*>, context: PsiElement?): List<PsiElement> {
@@ -201,11 +217,12 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
 
         var commonParent = PsiTreeUtil.findCommonParent(operation.occurrences)
         var element = operation.element
-        var varName = SuggestFirstLuaVarNameMacro.getElementSuggestName(PsiTreeUtil.getDeepestLast(element), element)
-        if (varName == null)
-        {
-            varName = "var"
-        }
+        var varName = "var"
+        operation.suggestedName = SuggestFirstLuaVarNameMacro.getElementSuggestName(PsiTreeUtil.getDeepestLast(element), element)
+//        if (varName == null)
+//        {
+//            varName = "var"
+//        }
         operation.name = varName
         if (commonParent != null) {
             val text = element.text
@@ -292,6 +309,19 @@ class LuaIntroduceVarHandler : RefactoringActionHandler {
         override fun checkLocalScope(): PsiElement? {
             val currentFile = PsiDocumentManager.getInstance(this.myProject).getPsiFile(this.myEditor.document)
             return currentFile ?: super.checkLocalScope()
+        }
+
+        override fun buildTemplateAndStart(
+            refs: MutableCollection<PsiReference>?,
+            stringUsages: MutableCollection<Pair<PsiElement, TextRange>>?,
+            scope: PsiElement?,
+            containingFile: PsiFile?
+        ): Boolean {
+            return super.buildTemplateAndStart(refs, stringUsages, scope, containingFile)
+        }
+
+        override fun getInitialName(): String {
+            return operation.suggestedName ?: super.getInitialName()
         }
 
         override fun moveOffsetAfter(success: Boolean) {

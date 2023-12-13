@@ -163,8 +163,7 @@ class LuaIndexExprType : LuaStubElementType<LuaIndexExprStub, LuaIndexExpr>("IND
                     callName = element.name
                 }
 
-                if (callName != null)
-                {
+                if (callName != null) {
                     callName = callName.replace(Regex("_.*"), "")
                 }
             }

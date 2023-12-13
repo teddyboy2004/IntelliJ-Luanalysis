@@ -19,6 +19,8 @@ package com.tang.intellij.lua.codeInsight.template.macro
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInsight.template.*
+import com.intellij.codeInsight.template.impl.MacroCallNode
+import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.codeInsight.template.impl.VariableNode
 import com.intellij.psi.PsiElement
 import com.intellij.psi.codeStyle.NameUtil
@@ -26,6 +28,7 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.elementType
 import com.intellij.refactoring.suggested.startOffset
 import com.tang.intellij.lua.comment.psi.LuaDocTagClass
+import com.tang.intellij.lua.editor.LuaNameSuggestionProvider
 import com.tang.intellij.lua.lang.type.LuaString
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.search.SearchContext
@@ -63,10 +66,44 @@ class SuggestFirstLuaVarNameMacro : Macro() {
             return null
         }
 
+
+        val editor = expressionContext.editor
+        if (editor == null) {
+            return null
+        }
+        var template = TemplateManager.getInstance(expressionContext.project).getActiveTemplate(editor) ?: return null
+        var index = -1
+        for ((i, variable) in template.variables.withIndex()) {
+            if (variable.expression is MacroCallNode && (variable.expression as MacroCallNode).macro == this) {
+                index = i
+                break
+            }
+        }
+        if (index == -1) {
+            return null
+        }
+        var templateState = TemplateManagerImpl.getTemplateState(editor) ?: return null
+        if (templateState.currentVariableNumber != index) {
+            var isMatch = false
+            if (templateState.currentVariableNumber + 1 == index) {
+                val stackTrace = Thread.currentThread().stackTrace
+                stackTrace.iterator().forEach { stackTraceElement ->
+                    if (stackTraceElement.methodName == "nextTab") {
+                        isMatch = true
+                        return@forEach
+                    }
+                }
+            }
+            if (!isMatch) {
+                return null
+            }
+        }
+
         // 获取当前正确的元素
         var element = expressionContext.psiElementAtStartOffset
-        if (element != null && expressionContext.editor != null) {
-            element = element.containingFile.findElementAt(expressionContext.editor!!.caretModel.offset)
+
+        if (element != null) {
+            element = element.containingFile.findElementAt(editor.caretModel.offset)
             if (element != null) {
                 element = PsiTreeUtil.getParentOfType(element, LuaLocalDefStat::class.java)
             }
@@ -102,9 +139,15 @@ class SuggestFirstLuaVarNameMacro : Macro() {
             // 根据类型判断命名
             if (element is LuaPsiTypeGuessable) {
                 val context = SearchContext.get(element.project)
+//                val set = HashSet<String>()
+//                LuaNameSuggestionProvider.GetSuggestedNames(element, set)
+//                if (set.isNotEmpty())
+//                {
+//                    return set.elementAt(0)
+//                }
                 var type = element.guessType(context)
                 val name = getElementSuggestNameByType(type, context)
-                if (name != null) {
+                if (name != null && !LuaNameSuggestionProvider.isKeyword(name)) {
                     return name
                 }
             }
@@ -114,7 +157,7 @@ class SuggestFirstLuaVarNameMacro : Macro() {
                 val functionName = element.indexExpr!!.name
                 if (functionName != null) {
                     val names = NameUtil.getSuggestionsByName(functionName, "", "", false, false, false)
-                    if (names.isNotEmpty()) {
+                    if (names.isNotEmpty() && !LuaNameSuggestionProvider.isKeyword(names[0])) {
                         return names[0]
                     }
                 }
@@ -142,18 +185,21 @@ class SuggestFirstLuaVarNameMacro : Macro() {
                     val file = resolveRequireFile(lastText, element.project)
                     if (file != null) {
                         val child = PsiTreeUtil.findChildOfType(file, LuaDocTagClass::class.java)
-                        if (child != null) {
+                        if (child != null && !LuaNameSuggestionProvider.isKeyword(child.name)) {
                             return child.name
                         }
                         val returnText = file.returnStatement()?.exprList?.text
                         // 过短也没有必要返回
-                        if (returnText != null && returnText.length > 3) {
+                        if (returnText != null && returnText.length > 3 && !LuaNameSuggestionProvider.isKeyword(returnText)) {
                             return returnText
                         }
                     }
                 }
                 // .只包含最后一个名称
                 lastText = lastText.replace(Regex(".*\\."), "")
+            }
+            if (LuaNameSuggestionProvider.isKeyword(lastText)) {
+                return "var"
             }
             return lastText
         }
@@ -182,9 +228,9 @@ class SuggestFirstLuaVarNameMacro : Macro() {
                 val declaration = PsiTreeUtil.getParentOfType(psi, LuaDeclaration::class.java)
                 if (declaration != null) {
                     if (declaration is LuaAssignStat) {
-                        return declaration.varExprList.lastChild.text
+                        return PsiTreeUtil.getDeepestLast(declaration.varExprList.lastChild).text
                     } else if (declaration is LuaLocalDefStat) {
-                        return declaration.localDefList.last().name
+                        return PsiTreeUtil.getDeepestLast(declaration.localDefList.last()).text
                     }
                 }
             }
