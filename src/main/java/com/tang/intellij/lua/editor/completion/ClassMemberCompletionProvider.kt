@@ -23,6 +23,7 @@ import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.psi.PsiFile
 import com.intellij.psi.TokenType
 import com.intellij.psi.util.PsiTreeUtil
+import com.tang.intellij.lua.Constants
 import com.tang.intellij.lua.lang.LuaIcons
 import com.tang.intellij.lua.project.LuaSettings
 import com.tang.intellij.lua.psi.*
@@ -158,7 +159,9 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
             // 显示未知调用
             if (LuaSettings.instance.isShowUnknownMethod) {
                 var show: Boolean = true
-
+                if (indexExpr.nameExpr?.text == Constants.WORD_SELF) {
+                    show = false
+                }
                 val last = indexExpr.expressionList.last()
 //                if (last is LuaNameExpr) {
 //                    show = last.isGlobal()
@@ -233,9 +236,9 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
         prefixMatcher: PrefixMatcher,
         handlerProcessor: HandlerProcessor?
     ) {
-        var childTypes = unionTy.getChildTypes()
-        var memberNameTypes = HashMap<String, ITy>()
-        var typeMembers = HashMap<String, TypeMember>()
+        val childTypes = unionTy.getChildTypes()
+        val memberNameTypes = HashMap<String, ITy>()
+        val typeMembers = HashMap<String, TypeMember>()
         childTypes.forEach { iTy ->
             if (iTy is TyClass) {
                 iTy.processMembers(context) { curType, member ->
@@ -243,7 +246,7 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
                     if (curClass != null) {
                         member.name?.let { memberName ->
                             if (prefixMatcher.prefixMatches(memberName) && curClass.isVisibleInScope(context.project, contextTy, member.visibility)) {
-                                var memberTy = member.guessType(context) ?: Primitives.UNKNOWN
+                                val memberTy = member.guessType(context) ?: Primitives.UNKNOWN
                                 var t = memberNameTypes[memberName]
                                 if (t == null) {
                                     t = memberTy
@@ -261,7 +264,7 @@ open class ClassMemberCompletionProvider : LuaCompletionProvider() {
             }
         }
 
-        memberNameTypes.forEach() { name, type ->
+        memberNameTypes.forEach() { (name, type) ->
             addMember(
                 context,
                 completionResultSet,

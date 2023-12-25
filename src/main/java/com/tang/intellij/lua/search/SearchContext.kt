@@ -22,6 +22,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.ProjectAndLibrariesScope
 import com.tang.intellij.lua.ext.ILuaTypeInfer
+import com.tang.intellij.lua.project.LuaSettings
 import com.tang.intellij.lua.psi.LuaPsiTypeGuessable
 import com.tang.intellij.lua.psi.ScopedTypeSubstitutor
 import com.tang.intellij.lua.ty.ITy
@@ -50,7 +51,7 @@ abstract class SearchContext() {
     private var myScope: GlobalSearchScope? = null
     private var myAbstractGenericScopeNames: Set<String>? = null
 
-    private val myInferCache = mutableMapOf<LuaPsiTypeGuessable, ITy>()
+    public val myInferCache = mutableMapOf<LuaPsiTypeGuessable, ITy>()
 
     protected constructor(sourceContext: SearchContext) : this() {
         myDumb = sourceContext.myDumb
@@ -142,7 +143,7 @@ abstract class SearchContext() {
     val cacheStats = mapOf<String, CacheStats>()
 
     private fun inferAndCache(psi: LuaPsiTypeGuessable): ITy? {
-        return if (index == -1) {
+        return if (index == -1 || LuaSettings.instance.isUseGlobalCache) {
             val result = myInferCache.getOrDefault(psi, null) ?: ILuaTypeInfer.infer(this, psi)
 
             if (result != null) {

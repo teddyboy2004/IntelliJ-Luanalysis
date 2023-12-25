@@ -48,6 +48,8 @@ class LuaSettings : PersistentStateComponent<LuaSettings> {
 
     var isShowWordsInFile: Boolean = true
 
+    var isUseGlobalCache: Boolean = false
+
     var isNilStrict: Boolean = false
 
     var isUnknownIndexable: Boolean = true

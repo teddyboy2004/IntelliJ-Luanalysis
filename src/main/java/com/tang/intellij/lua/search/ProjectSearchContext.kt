@@ -18,6 +18,7 @@ package com.tang.intellij.lua.search
 
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
+import com.tang.intellij.lua.project.LuaSettings
 
 
 class ProjectSearchContext : SearchContext {
@@ -29,6 +30,10 @@ class ProjectSearchContext : SearchContext {
 
     constructor(sourceContext: SearchContext): super(sourceContext) {
         this.project = sourceContext.project
+        if (LuaSettings.instance.isUseGlobalCache)
+        {
+            myInferCache.putAll(sourceContext.myInferCache)
+        }
     }
 
     override val element: PsiElement? = null

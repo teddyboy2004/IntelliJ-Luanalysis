@@ -59,6 +59,7 @@ public class LuaSettingsPanel implements SearchableConfigurable, Configurable.No
     private JTextField tooLargerFileThreshold;
     private JCheckBox autoInsertParameters;
     private JCheckBox showUnknownMethod;
+    private JCheckBox useGlobalCache;
 
     public LuaSettingsPanel() {
         settings = LuaSettings.Companion.getInstance();
@@ -68,6 +69,7 @@ public class LuaSettingsPanel implements SearchableConfigurable, Configurable.No
         showWordsInFile.setSelected(settings.isShowWordsInFile());
         autoInsertParameters.setSelected(settings.getAutoInsertParameters());
         showUnknownMethod.setSelected(settings.isShowUnknownMethod());
+        useGlobalCache.setSelected(settings.isUseGlobalCache());
         nilStrict.setSelected(settings.isNilStrict());
         unknownIndexable.setSelected(settings.isUnknownIndexable());
         unknownCallable.setSelected(settings.isUnknownCallable());
@@ -117,6 +119,7 @@ public class LuaSettingsPanel implements SearchableConfigurable, Configurable.No
                 settings.isShowWordsInFile() != showWordsInFile.isSelected() ||
                 settings.getAutoInsertParameters() != autoInsertParameters.isSelected() ||
                 settings.isShowUnknownMethod() != showUnknownMethod.isSelected() ||
+                settings.isUseGlobalCache() != useGlobalCache.isSelected() ||
                 settings.isNilStrict() != nilStrict.isSelected() ||
                 settings.isUnknownIndexable() != unknownIndexable.isSelected() ||
                 settings.isUnknownCallable() != unknownCallable.isSelected() ||
@@ -137,6 +140,7 @@ public class LuaSettingsPanel implements SearchableConfigurable, Configurable.No
         settings.setShowWordsInFile(showWordsInFile.isSelected());
         settings.setAutoInsertParameters(autoInsertParameters.isSelected());
         settings.setShowUnknownMethod(showUnknownMethod.isSelected());
+        settings.setUseGlobalCache(useGlobalCache.isSelected());
         settings.setNilStrict(nilStrict.isSelected());
         settings.setUnknownIndexable(unknownIndexable.isSelected());
         settings.setUnknownCallable(unknownCallable.isSelected());
