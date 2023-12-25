@@ -14,11 +14,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 
 public class LuaDocUnionTyImpl extends LuaDocTyImpl implements LuaDocUnionTy {
 
-    static HashMap<String, CacheData> typeCacheMap = new HashMap<String, CacheData>();
+    public static HashMap<String, CacheData> typeCacheMap = new HashMap<String, CacheData>();
 
     public LuaDocUnionTyImpl(@NotNull ASTNode node) {
         super(node);

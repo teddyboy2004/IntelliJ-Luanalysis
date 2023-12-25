@@ -118,6 +118,8 @@
         <enterHandlerDelegate implementation="com.tang.intellij.lua.editor.LuaEnterBetweenBracesHandler"/>
         <enterHandlerDelegate implementation="com.tang.intellij.lua.editor.LuaEnterBetweenRangeBlockHandler"/>
         <backspaceHandlerDelegate implementation="com.tang.intellij.lua.codeInsight.LuaBackspaceHandlerDelegate"/>
+        <backspaceHandlerDelegate implementation="com.tang.intellij.lua.search.SearchContext$BackspaceHandler"/>
+        <typedHandler implementation="com.tang.intellij.lua.search.SearchContext$TypedHandlerHandler"/>
         <typedHandler implementation="com.tang.intellij.lua.editor.LuaTypedHandler"/>
         <typedHandler implementation="com.tang.intellij.lua.editor.LuaAutoIndentHandler"/>
         <fileTypeDetector implementation="com.tang.intellij.lua.lang.LuaFileTypeDetector"/>

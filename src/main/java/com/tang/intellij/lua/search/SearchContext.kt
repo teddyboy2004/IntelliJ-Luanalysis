@@ -16,9 +16,14 @@
 
 package com.tang.intellij.lua.search
 
+import com.intellij.codeInsight.editorActions.BackspaceHandlerDelegate
+import com.intellij.codeInsight.editorActions.TypedHandlerDelegate
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.ProjectAndLibrariesScope
 import com.tang.intellij.lua.ext.ILuaTypeInfer
@@ -50,8 +55,6 @@ abstract class SearchContext() {
     private var myInStack = false
     private var myScope: GlobalSearchScope? = null
     private var myAbstractGenericScopeNames: Set<String>? = null
-
-    public val myInferCache = mutableMapOf<LuaPsiTypeGuessable, ITy>()
 
     protected constructor(sourceContext: SearchContext) : this() {
         myDumb = sourceContext.myDumb
@@ -158,7 +161,7 @@ abstract class SearchContext() {
 
     companion object {
         private val contextStack = ThreadLocal.withInitial { Stack<SearchContext>() }
-
+        public val myInferCache = mutableMapOf<LuaPsiTypeGuessable, ITy>()
         fun get(project: Project): SearchContext {
             val stack = contextStack.get()
 
@@ -220,6 +223,22 @@ abstract class SearchContext() {
                 it.myDumb = dumb
                 ret
             }
+        }
+    }
+
+    class TypedHandlerHandler : TypedHandlerDelegate(){
+        override fun beforeCharTyped(c: Char, project: Project, editor: Editor, file: PsiFile, fileType: FileType): Result {
+            myInferCache.clear()
+            return super.beforeCharTyped(c, project, editor, file, fileType)
+        }
+    }
+
+    class BackspaceHandler : BackspaceHandlerDelegate() {
+        override fun beforeCharDeleted(c: Char, file: PsiFile, editor: Editor) {
+            myInferCache.clear()
+        }
+        override fun charDeleted(c: Char, file: PsiFile, editor: Editor): Boolean {
+            return false
         }
     }
 }

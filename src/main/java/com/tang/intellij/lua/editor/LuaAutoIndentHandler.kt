@@ -17,8 +17,10 @@
 package com.tang.intellij.lua.editor
 
 import com.intellij.codeInsight.editorActions.TypedHandlerDelegate
+import com.intellij.model.search.SearchContext
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 import com.tang.intellij.lua.editor.completion.KeywordInsertHandler
@@ -41,6 +43,7 @@ class LuaAutoIndentHandler : TypedHandlerDelegate() {
                 KeywordInsertHandler.autoIndent(type, file, project, editor.document, caretModel.offset)
             }
         }
+
         return super.charTyped(c, project, editor, file)
     }
 }

@@ -30,10 +30,6 @@ class ProjectSearchContext : SearchContext {
 
     constructor(sourceContext: SearchContext): super(sourceContext) {
         this.project = sourceContext.project
-        if (LuaSettings.instance.isUseGlobalCache)
-        {
-            myInferCache.putAll(sourceContext.myInferCache)
-        }
     }
 
     override val element: PsiElement? = null
