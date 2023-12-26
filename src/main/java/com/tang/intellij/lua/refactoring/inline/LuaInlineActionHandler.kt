@@ -21,19 +21,19 @@ import com.intellij.lang.Language
 import com.intellij.lang.refactoring.InlineActionHandler
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReference
+import com.intellij.psi.impl.source.PostprocessReformattingAspect
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.refactoring.HelpID
 import com.intellij.refactoring.RefactoringBundle
 import com.intellij.refactoring.util.CommonRefactoringUtil
 import com.tang.intellij.lua.lang.LuaLanguage
-import com.tang.intellij.lua.psi.LuaElementFactory
 import com.tang.intellij.lua.psi.LuaLocalDef
 import com.tang.intellij.lua.psi.LuaLocalDefStat
 
@@ -42,8 +42,8 @@ import com.tang.intellij.lua.psi.LuaLocalDefStat
 class LuaInlineActionHandler : InlineActionHandler() {
     override fun inlineElement(project: Project, editor: Editor, psiElement: PsiElement) {
         if (psiElement is LuaLocalDef) {
-            var text = psiElement.text
-            var stat = psiElement.parent as LuaLocalDefStat
+            val text = psiElement.text
+            val stat = psiElement.parent as LuaLocalDefStat
             val allRefs = ProgressManager.getInstance().runProcessWithProgressSynchronously<Collection<PsiElement>, RuntimeException>(
                 {
                     ReferencesSearch.search(psiElement).mapping { obj: PsiReference -> obj.element }.findAll()
@@ -57,18 +57,21 @@ class LuaInlineActionHandler : InlineActionHandler() {
                 }, ModalityState.NON_MODAL)
                 return
             }
-            val replaceText = stat.exprList!!.text
-            val document = editor.document
-            val manager = PsiDocumentManager.getInstance(project)
+            if (stat.exprList == null) {
+                return
+            }
 
-            ApplicationManager.getApplication().invokeLater { WriteCommandAction.runWriteCommandAction(project) {
-                manager.doPostponedOperationsAndUnblockDocument(document)
-                for (p in allRefs.reversed()) {
-                    p.replace(LuaElementFactory.createWith(project, replaceText))
-                }
-                stat.delete()
-                manager.commitDocument(document)
-            } }
+            CommandProcessor.getInstance().executeCommand(
+                project, {
+                    PostprocessReformattingAspect.getInstance(project).postponeFormattingInside {
+                        WriteCommandAction.runWriteCommandAction(project) {
+                            allRefs.forEach { it.replace(stat.exprList!!) }
+                            stat.delete()
+                        }
+                    }
+                },
+                RefactoringBundle.message("inline.command", text), null
+            )
         }
     }
 
