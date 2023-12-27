@@ -147,10 +147,16 @@ abstract class SearchContext() {
 
     private fun inferAndCache(psi: LuaPsiTypeGuessable): ITy? {
         return if (index == -1 || LuaSettings.instance.isUseGlobalCache) {
-            val result = myInferCache.getOrDefault(psi, null) ?: ILuaTypeInfer.infer(this, psi)
+            val default = myInferCache.getOrDefault(psi, null)
+            val result = default ?: ILuaTypeInfer.infer(this, psi)
 
-            if (result != null) {
+            if (default == null && result != null) {
                 myInferCache[psi] = result
+                // 设置上限，避免打开项目内存过大
+                if (myInferCache.size > 10000)
+                {
+                    myInferCache.clear()
+                }
             }
 
             result
@@ -226,6 +232,7 @@ abstract class SearchContext() {
         }
     }
 
+    // 清理缓存数据
     class TypedHandlerHandler : TypedHandlerDelegate(){
         override fun beforeCharTyped(c: Char, project: Project, editor: Editor, file: PsiFile, fileType: FileType): Result {
             myInferCache.clear()

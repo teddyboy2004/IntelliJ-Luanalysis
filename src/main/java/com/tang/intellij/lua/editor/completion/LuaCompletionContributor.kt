@@ -31,6 +31,7 @@ import com.tang.intellij.lua.lang.LuaLanguage
 import com.tang.intellij.lua.project.LuaSettings
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
+import com.tang.intellij.lua.search.SearchContext
 
 /**
 
@@ -78,6 +79,8 @@ class LuaCompletionContributor : CompletionContributor() {
     }
 
     override fun fillCompletionVariants(parameters: CompletionParameters, result: CompletionResultSet) {
+        // 清理缓存，避免complete出错
+        SearchContext.myInferCache.clear()
         val session = CompletionSession(parameters, result)
         parameters.editor.putUserData(CompletionSession.KEY, session)
         super.fillCompletionVariants(parameters, result)
