@@ -99,6 +99,7 @@
         <completion.contributor language="Lua" implementationClass="com.tang.intellij.lua.editor.completion.SmartCompletionContributor"/>
         <completion.contributor language="Lua" implementationClass="com.tang.intellij.lua.editor.completion.LuaDocCompletionContributor"/>
         <completion.contributor language="Lua" implementationClass="com.tang.intellij.lua.editor.completion.LuaCompletionContributor"/>
+        <statistician key="completion" implementationClass="com.tang.intellij.lua.editor.completion.LuaCompletionStatistician"/>
 
         <!--codeInsight-->
         <codeInsight.lineMarkerProvider language="Lua" implementationClass="com.tang.intellij.lua.codeInsight.LuaLineMarkerProvider"/>
@@ -118,8 +119,6 @@
         <enterHandlerDelegate implementation="com.tang.intellij.lua.editor.LuaEnterBetweenBracesHandler"/>
         <enterHandlerDelegate implementation="com.tang.intellij.lua.editor.LuaEnterBetweenRangeBlockHandler"/>
         <backspaceHandlerDelegate implementation="com.tang.intellij.lua.codeInsight.LuaBackspaceHandlerDelegate"/>
-        <backspaceHandlerDelegate implementation="com.tang.intellij.lua.search.SearchContext$BackspaceHandler"/>
-        <typedHandler implementation="com.tang.intellij.lua.search.SearchContext$TypedHandlerHandler"/>
         <typedHandler implementation="com.tang.intellij.lua.editor.LuaTypedHandler"/>
         <typedHandler implementation="com.tang.intellij.lua.editor.LuaAutoIndentHandler"/>
         <fileTypeDetector implementation="com.tang.intellij.lua.lang.LuaFileTypeDetector"/>

@@ -16,14 +16,9 @@
 
 package com.tang.intellij.lua.search
 
-import com.intellij.codeInsight.editorActions.BackspaceHandlerDelegate
-import com.intellij.codeInsight.editorActions.TypedHandlerDelegate
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiFile
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.ProjectAndLibrariesScope
 import com.tang.intellij.lua.ext.ILuaTypeInfer
@@ -55,6 +50,7 @@ abstract class SearchContext() {
     private var myInStack = false
     private var myScope: GlobalSearchScope? = null
     private var myAbstractGenericScopeNames: Set<String>? = null
+    private val myInferCache = mutableMapOf<LuaPsiTypeGuessable, ITy>()
 
     protected constructor(sourceContext: SearchContext) : this() {
         myDumb = sourceContext.myDumb
@@ -94,18 +90,20 @@ abstract class SearchContext() {
         }
     }
 
-    val scope get(): GlobalSearchScope {
-        if (isDumb)
-            return GlobalSearchScope.EMPTY_SCOPE
-        if (myScope == null) {
-            myScope = ProjectAndLibrariesScope(project)
+    val scope
+        get(): GlobalSearchScope {
+            if (isDumb)
+                return GlobalSearchScope.EMPTY_SCOPE
+            if (myScope == null) {
+                myScope = ProjectAndLibrariesScope(project)
+            }
+            return myScope!!
         }
-        return myScope!!
-    }
 
-    val abstractGenericScopeNames get(): Set<String>? {
-        return myAbstractGenericScopeNames
-    }
+    val abstractGenericScopeNames
+        get(): Set<String>? {
+            return myAbstractGenericScopeNames
+        }
 
     val isDumb: Boolean
         get() = myDumb || DumbService.isDumb(project)
@@ -146,28 +144,44 @@ abstract class SearchContext() {
     val cacheStats = mapOf<String, CacheStats>()
 
     private fun inferAndCache(psi: LuaPsiTypeGuessable): ITy? {
-        return if (index == -1 || LuaSettings.instance.isUseGlobalCache) {
-            val default = myInferCache.getOrDefault(psi, null)
-            val result = default ?: ILuaTypeInfer.infer(this, psi)
+        return when {
+            useGlobalTypeCache -> {
+                val result = globalTypeCache.getOrDefault(psi, null) ?: ILuaTypeInfer.infer(this, psi)
 
-            if (default == null && result != null) {
-                myInferCache[psi] = result
-                // 设置上限，避免打开项目内存过大
-                if (myInferCache.size > 10000)
-                {
-                    myInferCache.clear()
+                if (result != null) {
+                    globalTypeCache[psi] = result
                 }
-            }
 
-            result
-        } else {
-            ILuaTypeInfer.infer(this, psi)
+                result
+            }
+            index == -1 -> {
+                val result = myInferCache.getOrDefault(psi, null) ?: ILuaTypeInfer.infer(this, psi)
+
+                if (result != null) {
+                    myInferCache[psi] = result
+                }
+
+                result
+            }
+            else -> {
+                ILuaTypeInfer.infer(this, psi)
+            }
         }
     }
 
     companion object {
         private val contextStack = ThreadLocal.withInitial { Stack<SearchContext>() }
-        public val myInferCache = mutableMapOf<LuaPsiTypeGuessable, ITy>()
+        private val globalTypeCache = mutableMapOf<LuaPsiTypeGuessable, ITy>()
+        private var useGlobalTypeCache = false
+
+        fun SetUseGlobalTyepCache(cache: Boolean) {
+            if (!LuaSettings.instance.isUseGlobalCache) {
+                return
+            }
+            useGlobalTypeCache = cache
+            globalTypeCache.clear()
+        }
+
         fun get(project: Project): SearchContext {
             val stack = contextStack.get()
 
@@ -232,20 +246,20 @@ abstract class SearchContext() {
         }
     }
 
-    // 清理缓存数据
-    class TypedHandlerHandler : TypedHandlerDelegate(){
-        override fun beforeCharTyped(c: Char, project: Project, editor: Editor, file: PsiFile, fileType: FileType): Result {
-            myInferCache.clear()
-            return super.beforeCharTyped(c, project, editor, file, fileType)
-        }
-    }
-
-    class BackspaceHandler : BackspaceHandlerDelegate() {
-        override fun beforeCharDeleted(c: Char, file: PsiFile, editor: Editor) {
-            myInferCache.clear()
-        }
-        override fun charDeleted(c: Char, file: PsiFile, editor: Editor): Boolean {
-            return false
-        }
-    }
+//    // 清理缓存数据
+//    class TypedHandlerHandler : TypedHandlerDelegate(){
+//        override fun beforeCharTyped(c: Char, project: Project, editor: Editor, file: PsiFile, fileType: FileType): Result {
+//            myInferCache.clear()
+//            return super.beforeCharTyped(c, project, editor, file, fileType)
+//        }
+//    }
+//
+//    class BackspaceHandler : BackspaceHandlerDelegate() {
+//        override fun beforeCharDeleted(c: Char, file: PsiFile, editor: Editor) {
+//            myInferCache.clear()
+//        }
+//        override fun charDeleted(c: Char, file: PsiFile, editor: Editor): Boolean {
+//            return false
+//        }
+//    }
 }

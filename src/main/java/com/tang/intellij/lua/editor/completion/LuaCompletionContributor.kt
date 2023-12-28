@@ -80,13 +80,14 @@ class LuaCompletionContributor : CompletionContributor() {
 
     override fun fillCompletionVariants(parameters: CompletionParameters, result: CompletionResultSet) {
         // 清理缓存，避免complete出错
-        SearchContext.myInferCache.clear()
+        SearchContext.SetUseGlobalTyepCache(true)
         val session = CompletionSession(parameters, result)
         parameters.editor.putUserData(CompletionSession.KEY, session)
         super.fillCompletionVariants(parameters, result)
         if (LuaSettings.instance.isShowWordsInFile && suggestWords && session.isSuggestWords && !result.isStopped) {
             suggestWordsInFile(parameters)
         }
+        SearchContext.SetUseGlobalTyepCache(false)
     }
 
     override fun beforeCompletion(context: CompletionInitializationContext) {
