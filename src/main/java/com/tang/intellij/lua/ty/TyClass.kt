@@ -37,7 +37,6 @@ import com.tang.intellij.lua.search.ProjectSearchContext
 import com.tang.intellij.lua.search.PsiSearchContext
 import com.tang.intellij.lua.search.SearchContext
 import com.tang.intellij.lua.stubs.*
-import com.tang.intellij.lua.stubs.index.LuaAliasIndex
 
 
 interface ITyClass : ITyResolvable {
@@ -97,8 +96,8 @@ fun ITyClass.isVisibleInScope(project: Project, contextTy: ITy, visibility: Visi
     TyUnion.each(contextTy) {
         if (it is ITyClass) {
             if (it == this || (
-                            visibility == Visibility.PROTECTED
-                            && LuaClassInheritorsSearch.isClassInheritFrom(GlobalSearchScope.projectScope(project), project, className, it.className))
+                        visibility == Visibility.PROTECTED
+                                && LuaClassInheritorsSearch.isClassInheritFrom(GlobalSearchScope.projectScope(project), project, className, it.className))
             ) {
                 return true
             }
@@ -170,11 +169,12 @@ private fun equalToShape(context: SearchContext, target: ITy, source: ITy): Bool
     return targetMemberCount == sourceMemberCount
 }
 
-abstract class TyClass(override val className: String,
-                       override var params: Array<TyGenericParameter>? = null,
-                       override val varName: String? = "",
-                       override var superClass: ITy? = null,
-                       override var signatures: Array<IFunSignature>? = null
+abstract class TyClass(
+    override val className: String,
+    override var params: Array<TyGenericParameter>? = null,
+    override val varName: String? = "",
+    override var superClass: ITy? = null,
+    override var signatures: Array<IFunSignature>? = null,
 ) : Ty(TyKind.Class), ITyClass {
 
     final override var aliasName: String? = null
@@ -267,31 +267,22 @@ abstract class TyClass(override val className: String,
             this.aliasTy!!.ty.processMembers(context, deep, process)
         }
 
-        // 处理同时存在tablefield和luaIndex的情况下的去重，优先显示tablefield
-        val tableFields = mutableListOf<LuaTableField>()
-        val luaIndexExprs = mutableListOf<LuaIndexExpr>()
+        val memberNames = mutableSetOf<String>()
+        val removeList = mutableListOf<LuaPsiTypeMember>()
         for (member in members) {
-            if (member is LuaTableField) {
-                tableFields.add(member)
+            var name = member.name
+            if (name == null) {
+                val indexTy = member.guessIndexType(context)
+                if (indexTy != null) {
+                    name = "[${indexTy.displayName}]"
+                }
             }
-            else if (member is LuaIndexExpr)
-            {
-                luaIndexExprs.add(member)
+            if (name != null && !memberNames.add(name)) {
+                removeList.add(member)
             }
         }
 
-        for (tableField in tableFields) {
-            // 修复去重错误
-            var indexTy = tableField.name
-            for (luaIndexExpr in luaIndexExprs) {
-                if (luaIndexExpr.name == indexTy)
-                {
-                    members.remove(luaIndexExpr)
-                    luaIndexExprs.remove(luaIndexExpr)
-                    break
-                }
-            }
-        }
+        removeList.forEach { members.remove(it) }
 
         for (member in members) {
             ProgressManager.checkCanceled()
@@ -363,7 +354,8 @@ abstract class TyClass(override val className: String,
     }
 
     override fun processIndexer(context: SearchContext, indexTy: ITy, exact: Boolean, deep: Boolean, indexerSubstitutor: ITySubstitutor?, process: ProcessTypeMember): Boolean {
-        return LuaShortNamesManager.getInstance(context.project).processIndexer(context, this, indexTy, exact, true, deep, TyChainSubstitutor.chain(getMemberSubstitutor(context), indexerSubstitutor), process)
+        return LuaShortNamesManager.getInstance(context.project)
+            .processIndexer(context, this, indexTy, exact, true, deep, TyChainSubstitutor.chain(getMemberSubstitutor(context), indexerSubstitutor), process)
     }
 
     override fun accept(visitor: ITyVisitor) {
@@ -511,14 +503,15 @@ class TyPsiDocClass(override val psi: LuaDocTagClass) : TyClass(
     override fun doLazyInit(searchContext: SearchContext) {}
 }
 
-open class TySerializedClass(name: String,
-                             params: Array<TyGenericParameter>? = null,
-                             varName: String? = null,
-                             superClass: ITy? = null,
-                             signatures: Array<IFunSignature>? = null,
-                             alias: String? = null,
-                             flags: Int = 0)
-    : TyClass(name, params, varName, superClass, signatures) {
+open class TySerializedClass(
+    name: String,
+    params: Array<TyGenericParameter>? = null,
+    varName: String? = null,
+    superClass: ITy? = null,
+    signatures: Array<IFunSignature>? = null,
+    alias: String? = null,
+    flags: Int = 0,
+) : TyClass(name, params, varName, superClass, signatures) {
     init {
         aliasName = alias
         this.flags = flags
@@ -561,13 +554,15 @@ class TyLazyClass(name: String, val psi: PsiElement? = null) : TySerializedClass
 
 }
 
-fun createSerializedClass(name: String,
-                          params: Array<TyGenericParameter>? = null,
-                          varName: String? = null,
-                          superClass: ITy? = null,
-                          signatures: Array<IFunSignature>? = null,
-                          alias: String? = null,
-                          flags: Int = 0): TyClass {
+fun createSerializedClass(
+    name: String,
+    params: Array<TyGenericParameter>? = null,
+    varName: String? = null,
+    superClass: ITy? = null,
+    signatures: Array<IFunSignature>? = null,
+    alias: String? = null,
+    flags: Int = 0,
+): TyClass {
     val list = name.split("|")
     if (list.size == 3) {
         val type = list[0].toInt()
@@ -664,8 +659,7 @@ fun getTableTypeName(table: LuaTableExpr): String {
 
     val id = table.containingFile.getFileIdentifier()
     // 优化全局搜索
-    if((table.parent is LuaExprList && table.parent.parent is LuaAssignStat))
-    {
+    if ((table.parent is LuaExprList && table.parent.parent is LuaAssignStat)) {
         val assign = table.parent.parent as LuaAssignStat
         if (assign.varExprList.firstChild is LuaNameExpr) {
             val child = assign.varExprList.firstChild as LuaNameExpr
@@ -781,7 +775,7 @@ open class TyTable(override val psi: LuaTableExpr, name: String = getTableTypeNa
                 }
 
                 (indexTy is ITyPrimitive && indexTy.primitiveKind == TyPrimitiveKind.String)
-                            || (indexTy is TyPrimitiveLiteral && indexTy.primitiveKind == TyPrimitiveKind.String && indexTy.value == name)
+                        || (indexTy is TyPrimitiveLiteral && indexTy.primitiveKind == TyPrimitiveKind.String && indexTy.value == name)
             }
         }?.let {
             process(this, it)
@@ -808,7 +802,8 @@ open class TyTable(override val psi: LuaTableExpr, name: String = getTableTypeNa
             }
 
             if ((!exact && candidateIndexerTy?.contravariantOf(context, indexTy, TyVarianceFlags.STRICT_UNKNOWN) == true)
-                    || candidateIndexerTy == indexTy) {
+                || candidateIndexerTy == indexTy
+            ) {
                 if (narrowestIndexTy?.contravariantOf(context, candidateIndexerTy, TyVarianceFlags.STRICT_UNKNOWN) != false) {
                     narrowestTypeMember = field
                     narrowestIndexTy = candidateIndexerTy
@@ -906,7 +901,8 @@ open class TyDocTable(override val psi: LuaDocTableDef, name: String = getDocTab
             }
 
             if ((!exact && candidateIndexerTy?.contravariantOf(context, indexTy, TyVarianceFlags.STRICT_UNKNOWN) == true)
-                || candidateIndexerTy == indexTy) {
+                || candidateIndexerTy == indexTy
+            ) {
                 if (narrowestIndexTy?.contravariantOf(context, candidateIndexerTy, TyVarianceFlags.STRICT_UNKNOWN) != false) {
                     narrowestTypeMember = field
                     narrowestIndexTy = candidateIndexerTy
@@ -922,7 +918,7 @@ open class TyDocTable(override val psi: LuaDocTableDef, name: String = getDocTab
     }
 }
 
-class TySubstitutedDocTable(docTable: TyDocTable, val substitutor: ITySubstitutor): TyDocTable(docTable.psi, getSubstitutedDocTableTypeName(docTable.psi)) {
+class TySubstitutedDocTable(docTable: TyDocTable, val substitutor: ITySubstitutor) : TyDocTable(docTable.psi, getSubstitutedDocTableTypeName(docTable.psi)) {
     init {
         // TODO: This is a hack. This just convinces the LuaClassMemberIndex to look for members using the parent doc
         //       table's name. Instead we should implement processMember/Indexer and call LuaClassMemberIndex with the
@@ -937,7 +933,7 @@ class TySubstitutedDocTable(docTable: TyDocTable, val substitutor: ITySubstituto
     }
 }
 
-class TyLazySubstitutedTable(context: SearchContext, table: TyTable, val substitutor: ITySubstitutor): TyTable(table.psi, getSubstitutedTableTypeName(context, table.psi, substitutor)) {
+class TyLazySubstitutedTable(context: SearchContext, table: TyTable, val substitutor: ITySubstitutor) : TyTable(table.psi, getSubstitutedTableTypeName(context, table.psi, substitutor)) {
     init {
         // TODO: This is a hack. This just convinces the LuaClassMemberIndex to look for members using the parent
         //       table's name. Instead we should implement processMember/Indexer and call LuaClassMemberIndex with the
@@ -948,11 +944,9 @@ class TyLazySubstitutedTable(context: SearchContext, table: TyTable, val substit
     }
 
     override fun getSuperType(context: SearchContext): ITy? {
-        if (superClass is TyTable)
-        {
+        if (superClass is TyTable) {
             // 避免table显示错误override图标
-            if ((superClass as TyTable).psi == psi)
-            {
+            if ((superClass as TyTable).psi == psi) {
                 superClass = (superClass as TyTable).getSuperType(context)
             }
         }
@@ -999,13 +993,15 @@ object TyClassSerializer : TySerializer<ITyClass>() {
         val superClass = stream.readTyNullable()
         val signatures = stream.readSignatureNullable()
         val aliasName = stream.readName()
-        return createSerializedClass(StringRef.toString(className),
-                params,
-                StringRef.toString(varName),
-                superClass,
-                signatures,
-                StringRef.toString(aliasName),
-                flags)
+        return createSerializedClass(
+            StringRef.toString(className),
+            params,
+            StringRef.toString(varName),
+            superClass,
+            signatures,
+            StringRef.toString(aliasName),
+            flags
+        )
     }
 
     override fun serializeTy(ty: ITyClass, stream: StubOutputStream) {

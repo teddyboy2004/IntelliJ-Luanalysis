@@ -22,6 +22,7 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtilCore
+import com.intellij.psi.util.prevLeaf
 import com.tang.intellij.lua.lang.LuaFileType
 import com.tang.intellij.lua.lang.LuaLanguage
 import com.tang.intellij.lua.psi.LuaTypes
@@ -42,6 +43,11 @@ class LuaCodeContextType : TemplateContextType("LUA_CODE", "Lua") {
                 return false
             }
             if (element.node.elementType in arrayOf(LuaTypes.STRING, LuaTypes.NUMBER)) {
+                return false
+            }
+            // 避免在.或:后提示
+            val prevLeaf = element.prevLeaf()
+            if (prevLeaf != null && (prevLeaf.text == "." || prevLeaf.text == ":")) {
                 return false
             }
         }

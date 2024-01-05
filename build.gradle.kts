@@ -1,6 +1,8 @@
 import de.undercouch.gradle.tasks.download.Download
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.text.SimpleDateFormat
+import java.util.*
 
 fun properties(key: String) = project.findProperty(key).toString()
 
@@ -15,8 +17,9 @@ plugins {
     id("de.undercouch.download") version "3.4.3"
 }
 
+
 group = properties("pluginGroup")
-version = properties("pluginVersion")
+version = properties("pluginVersion").plus(".").plus(SimpleDateFormat("yyyyMMdd").format(Date()))
 
 repositories {
     mavenCentral()

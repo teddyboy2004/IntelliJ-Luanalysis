@@ -21,16 +21,13 @@ import com.intellij.codeInsight.editorActions.TypedHandlerDelegate
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
-import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.suggested.endOffset
 import com.intellij.refactoring.suggested.startOffset
 import com.tang.intellij.lua.editor.completion.KeywordInsertHandler
 import com.tang.intellij.lua.lang.LuaFileType
 import com.tang.intellij.lua.psi.*
-import com.tang.intellij.lua.search.SearchContext
 
 
 /**
@@ -43,7 +40,8 @@ class LuaTypedHandler : TypedHandlerDelegate() {
         if (file.fileType == LuaFileType.INSTANCE) {
             when (charTyped) {
                 ':',
-                '@' -> {
+                '@',
+                -> {
                     AutoPopupController.getInstance(project).autoPopupMemberLookup(editor, null)
                     return TypedHandlerDelegate.Result.STOP
                 }
@@ -52,7 +50,8 @@ class LuaTypedHandler : TypedHandlerDelegate() {
                     val element = file.findElementAt(editor.caretModel.offset - 1)
                     when (element?.node?.elementType) {
                         LuaTypes.DOT,
-                        LuaTypes.SHORT_COMMENT -> return TypedHandlerDelegate.Result.STOP
+                        LuaTypes.SHORT_COMMENT,
+                        -> return TypedHandlerDelegate.Result.STOP
 
                         LuaTypes.ID -> {
                             if (element?.text == "self" && element.parent is LuaNameExpr) {

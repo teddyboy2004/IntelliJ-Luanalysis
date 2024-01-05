@@ -150,6 +150,9 @@ abstract class SearchContext() {
 
                 if (result != null) {
                     globalTypeCache[psi] = result
+                    if (globalTypeCache.size > 10000) {
+                        globalTypeCache.clear()
+                    }
                 }
 
                 result

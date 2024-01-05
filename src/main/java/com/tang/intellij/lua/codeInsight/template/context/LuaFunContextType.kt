@@ -20,13 +20,25 @@ import com.intellij.codeInsight.template.TemplateContextType
 import com.intellij.psi.PsiComment
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.PsiUtilCore
+import com.intellij.psi.util.prevLeaf
+import com.tang.intellij.lua.lang.LuaLanguage
 import com.tang.intellij.lua.psi.LuaFuncBody
 
 class LuaFunContextType : TemplateContextType("LUA_FUNCTION", "function", LuaCodeContextType::class.java) {
 
     override fun isInContext(psiFile: PsiFile, i: Int): Boolean {
-        if (PsiTreeUtil.findElementOfClassAtOffset(psiFile,i, PsiComment::class.java, false) != null) {
+        if (PsiTreeUtil.findElementOfClassAtOffset(psiFile, i, PsiComment::class.java, false) != null) {
             return false
+
+        }
+        if (PsiUtilCore.getLanguageAtOffset(psiFile, i).isKindOf(LuaLanguage.INSTANCE)) {
+            val element = psiFile.findElementAt(i)
+            // 避免在.或:后提示
+            val prevLeaf = element?.prevLeaf()
+            if (prevLeaf != null && (prevLeaf.text == "." || prevLeaf.text == ":")) {
+                return false
+            }
         }
         return PsiTreeUtil.findElementOfClassAtOffset(psiFile, i, LuaFuncBody::class.java, false) != null
     }

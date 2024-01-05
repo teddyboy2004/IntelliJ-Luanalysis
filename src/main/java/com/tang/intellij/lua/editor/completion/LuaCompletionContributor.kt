@@ -32,6 +32,7 @@ import com.tang.intellij.lua.project.LuaSettings
 import com.tang.intellij.lua.psi.*
 import com.tang.intellij.lua.refactoring.LuaRefactoringUtil
 import com.tang.intellij.lua.search.SearchContext
+import java.lang.Exception
 
 /**
 
@@ -39,6 +40,7 @@ import com.tang.intellij.lua.search.SearchContext
  */
 class LuaCompletionContributor : CompletionContributor() {
     private var suggestWords = true
+
     init {
         // 优先提示table结构变量
         extend(CompletionType.BASIC, IN_TABLE_FIELD, TableCompletionProvider())
@@ -62,7 +64,7 @@ class LuaCompletionContributor : CompletionContributor() {
 
         extend(CompletionType.BASIC, IN_CLASS_METHOD_NAME, LocalAndGlobalCompletionProvider(LocalAndGlobalCompletionProvider.VARS))
 
-        extend(CompletionType.BASIC, GOTO, object : CompletionProvider<CompletionParameters>(){
+        extend(CompletionType.BASIC, GOTO, object : CompletionProvider<CompletionParameters>() {
             override fun addCompletions(parameters: CompletionParameters, context: ProcessingContext, resultSet: CompletionResultSet) {
                 LuaPsiTreeUtil.walkUpLabel(parameters.position) {
                     val name = it.name
@@ -81,11 +83,15 @@ class LuaCompletionContributor : CompletionContributor() {
     override fun fillCompletionVariants(parameters: CompletionParameters, result: CompletionResultSet) {
         // 清理缓存，避免complete出错
         SearchContext.SetUseGlobalTyepCache(true)
-        val session = CompletionSession(parameters, result)
-        parameters.editor.putUserData(CompletionSession.KEY, session)
-        super.fillCompletionVariants(parameters, result)
-        if (LuaSettings.instance.isShowWordsInFile && suggestWords && session.isSuggestWords && !result.isStopped) {
-            suggestWordsInFile(parameters)
+        try {
+            val session = CompletionSession(parameters, result)
+            parameters.editor.putUserData(CompletionSession.KEY, session)
+            super.fillCompletionVariants(parameters, result)
+            if (LuaSettings.instance.isShowWordsInFile && suggestWords && session.isSuggestWords && !result.isStopped) {
+                suggestWordsInFile(parameters)
+            }
+        } catch (_: Exception) {
+
         }
         SearchContext.SetUseGlobalTyepCache(false)
     }
@@ -116,43 +122,43 @@ class LuaCompletionContributor : CompletionContributor() {
         private val IGNORE_SET = TokenSet.create(LuaTypes.STRING, LuaTypes.NUMBER, LuaTypes.CONCAT)
 
         private val SHOW_CLASS_FIELD = psiElement(LuaTypes.ID)
-                .withParent(LuaIndexExpr::class.java)
+            .withParent(LuaIndexExpr::class.java)
 
         private val IN_FUNC_NAME = psiElement(LuaTypes.ID)
-                .withParent(LuaIndexExpr::class.java)
-                .inside(LuaClassMethodName::class.java)
+            .withParent(LuaIndexExpr::class.java)
+            .inside(LuaClassMethodName::class.java)
         private val AFTER_FUNCTION = psiElement()
-                .afterLeaf(psiElement(LuaTypes.FUNCTION))
+            .afterLeaf(psiElement(LuaTypes.FUNCTION))
         private val IN_CLASS_METHOD_NAME = psiElement().andOr(IN_FUNC_NAME, AFTER_FUNCTION)
 
         private val IN_NAME_EXPR = psiElement(LuaTypes.ID)
-                .withParent(LuaNameExpr::class.java)
+            .withParent(LuaNameExpr::class.java)
 
         private val IN_LOCAL_DEF_NAME = psiElement(LuaTypes.ID)
             .withParent(LuaLocalDef::class.java)
             .andNot(psiElement().afterLeaf("<"))
 
         private val SHOW_OVERRIDE = psiElement()
-                .withParent(LuaClassMethodName::class.java)
+            .withParent(LuaClassMethodName::class.java)
         private val IN_CLASS_METHOD = psiElement(LuaTypes.ID)
-                .withParent(LuaNameExpr::class.java)
-                .inside(LuaClassMethodDefStat::class.java)
+            .withParent(LuaNameExpr::class.java)
+            .inside(LuaClassMethodDefStat::class.java)
         private val SHOW_REQUIRE_PATH = psiElement(LuaTypes.STRING)
-                .withParent(
-                        psiElement(LuaTypes.LITERAL_EXPR).withParent(
-                                psiElement(LuaArgs::class.java).afterSibling(
-                                        psiElement().with(RequireLikePatternCondition())
-                                )
-                        )
+            .withParent(
+                psiElement(LuaTypes.LITERAL_EXPR).withParent(
+                    psiElement(LuaArgs::class.java).afterSibling(
+                        psiElement().with(RequireLikePatternCondition())
+                    )
                 )
+            )
 
         private val GOTO = psiElement(LuaTypes.ID).withParent(LuaGotoStat::class.java)
 
         private val IN_TABLE_FIELD = psiElement().andOr(
-                psiElement().withParent(
-                        psiElement(LuaTypes.NAME_EXPR).withParent(LuaTableField::class.java)
-                ),
-                psiElement(LuaTypes.ID).withParent(LuaTableField::class.java)
+            psiElement().withParent(
+                psiElement(LuaTypes.NAME_EXPR).withParent(LuaTableField::class.java)
+            ),
+            psiElement(LuaTypes.ID).withParent(LuaTableField::class.java)
         )
 
         private val ATTRIBUTE = psiElement(LuaTypes.ID)
@@ -169,9 +175,12 @@ class LuaCompletionContributor : CompletionContributor() {
             wordsScanner?.processWords(parameters.editor.document.charsSequence) {
                 val word = it.baseText.subSequence(it.start, it.end).toString()
                 if (word.length > 2 && LuaRefactoringUtil.isLuaIdentifier(word) && session.addWord(word)) {
-                    session.resultSet.addElement(PrioritizedLookupElement.withPriority(LookupElementBuilder
-                            .create(word)
-                            .withIcon(LuaIcons.WORD), -1.0)
+                    session.resultSet.addElement(
+                        PrioritizedLookupElement.withPriority(
+                            LookupElementBuilder
+                                .create(word)
+                                .withIcon(LuaIcons.WORD), -1.0
+                        )
                     )
                 }
                 true
@@ -180,7 +189,7 @@ class LuaCompletionContributor : CompletionContributor() {
     }
 }
 
-class RequireLikePatternCondition : PatternCondition<PsiElement>("requireLike"){
+class RequireLikePatternCondition : PatternCondition<PsiElement>("requireLike") {
     override fun accepts(psi: PsiElement, context: ProcessingContext?): Boolean {
         val name = (psi as? PsiNamedElement)?.name
         return if (name != null) LuaSettings.isRequireLikeFunctionName(name) else false
