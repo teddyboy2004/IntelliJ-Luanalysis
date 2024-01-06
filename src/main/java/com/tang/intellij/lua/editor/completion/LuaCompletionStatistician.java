@@ -17,7 +17,7 @@
 package com.tang.intellij.lua.editor.completion;
 
 import com.intellij.codeInsight.completion.CompletionLocation;
-import com.intellij.codeInsight.completion.DefaultCompletionStatistician;
+import com.intellij.codeInsight.completion.CompletionStatistician;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.psi.statistics.StatisticsInfo;
 import org.jetbrains.annotations.NotNull;
@@ -25,7 +25,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
-public class LuaCompletionStatistician extends DefaultCompletionStatistician {
+public class LuaCompletionStatistician extends CompletionStatistician {
+
+    @Override
+    public StatisticsInfo serialize(@NotNull final LookupElement element, @NotNull final CompletionLocation location) {
+        return forLocation(location).apply(element);
+    }
 
     // 处理函数按使用排序
     @Override
